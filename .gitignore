@@ -1,0 +1,9 @@
+# match data is gated and not redistributable: never committed
+data
+*.mp4
+*.npz
+*.parquet
+.venv/
+__pycache__/
+*.py[cod]
+.DS_Store
