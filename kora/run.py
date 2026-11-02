@@ -13,9 +13,9 @@ import joblib
 import numpy as np
 import pandas as pd
 
-from .decode import decode
+from .boundary import context
+from .decode import decode, decode_hsmm
 from .features import build
-from .stack import context
 from .target import load_target
 
 warnings.filterwarnings("ignore", category=RuntimeWarning)
@@ -28,12 +28,15 @@ def predict():
     bundle = joblib.load(MODELS / "classifier.joblib")
     cfg = json.loads((MODELS / "decoder.json").read_text())
     proba = bundle["model"].predict_proba(X[bundle["columns"]].to_numpy())
-    dec = cfg
-    if "stage2" in cfg:                       # kept only if it won leave-one-match-out CV
-        s2 = joblib.load(MODELS / "stage2.joblib")
-        proba = s2["model"].predict_proba(context(proba, X[s2["raw"]]).to_numpy())
-        dec = cfg["stage2"]
-    path = decode(proba, graded, np.array(cfg["prior"]), dec["alpha"], dec["cost_ha"], dec["cost_d"])
+    prior = np.array(cfg["prior"])
+    if "hsmm" in cfg:                         # kept only if it won leave-one-match-out CV
+        h = cfg["hsmm"]
+        det = joblib.load(MODELS / "boundary.joblib")
+        change = det["model"].predict_proba(context(proba, X[det["raw"]]))[:, 1]
+        path = decode_hsmm(proba, change, graded, prior, np.array(h["log_duration"]),
+                           h["cost_ha"], h["cost_d"], h["w_dur"], h["beta"], h["rate"])
+    else:
+        path = decode(proba, graded, prior, cfg["alpha"], cfg["cost_ha"], cfg["cost_d"])
     labels = np.full(len(path), "X", dtype="<U1")
     for a, b in graded:
         labels[a:b] = np.array(["H", "A", "D"])[path[a:b]]
