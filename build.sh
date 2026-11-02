@@ -5,11 +5,24 @@ set -e
 cd "$(dirname "$0")"
 PY=.venv/bin/python
 [ -x "$PY" ] || { python3 -m venv .venv && .venv/bin/pip install -q -r requirements.txt; }
-caffeinate -i "$PY" -m kora.external          # 7 open Bundesliga matches -> data/cache
-caffeinate -i "$PY" -m kora.train             # classifier + decoder by leave-one-match-out CV
-caffeinate -i "$PY" -m kora.boundary          # change detector + duration decoder, kept only if CV says it helps
+# Keep macOS awake during training; Linux runs the same commands directly.
+run_awake() {
+    if [ "$(uname -s)" = Darwin ] && command -v caffeinate >/dev/null 2>&1; then
+        caffeinate -i "$@"
+    else
+        "$@"
+    fi
+}
+run_awake "$PY" -m kora.external             # 7 open Bundesliga matches -> data/cache
+run_awake "$PY" -m kora.train                # classifier + decoder by leave-one-match-out CV
+run_awake "$PY" -m kora.boundary             # change detector + duration decoder, kept only if CV says it helps
 "$PY" -m kora.run --out "${1:-Kora Analytics.csv}"
 "$PY" -m kora.checks "${1:-Kora Analytics.csv}"
 want=$(cut -d' ' -f1 models/submission.sha256)
 got=$(shasum -a 256 "${1:-Kora Analytics.csv}" | cut -d' ' -f1)
-if [ "$want" = "$got" ]; then echo "reproduced: identical to the committed submission"; else echo "DIFFERENT from the committed submission: $got"; fi
+if [ "$want" = "$got" ]; then
+    echo "reproduced: identical to the committed submission"
+else
+    echo "DIFFERENT from the committed submission: $got" >&2
+    exit 1
+fi

@@ -21,5 +21,8 @@ shasum -a 256 -c models/submission.sha256                 # must print OK: ident
 .venv/bin/python -m kora.checks "Kora Analytics.csv"      # label-free sanity checks on the challenge output
 ```
 
+`build.sh` runs on Linux and macOS. On macOS it uses `caffeinate` when available to keep the machine
+awake during training. A submission hash mismatch fails the build with a nonzero exit status.
+
 The match data is gated and never committed; `data/` and every derived array are gitignored.
 See `docs/method.md` for the method and `CONTRIBUTING.md` for how we work.
