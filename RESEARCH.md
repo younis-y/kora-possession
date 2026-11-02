@@ -201,7 +201,30 @@ dead-ball targets. Wide feature windows may blur nearby transitions.
 weights, and extra weight near short spells. Measure short-spell recall and false fragments
 at all five IoUs.
 
-**Outcome:** —
+**Outcome:** Read-only label audit done. The target experiment has not run.
+
+- Scope: `boundary.target` applied to the labels of the seven IDSSE training matches. No
+  features, models, or challenge data were used. The audit counts target labels only.
+- Of 2,351 handovers, 41 lose some of their 11 class-1 window frames to class 2 (1.7%). None is
+  fully erased. Two more are shortened only by clipping at the array end. Overwriting removes 187
+  of 25,341 handover-target frames (0.7%). After the `[::2]` subsampling in training, 90 of
+  12,635 are removed.
+- The affected handovers are concentrated near stoppages. 36 occur within 10 frames before a
+  stoppage and 5 within 10 frames after a restart. 38 of the 41 start a true possession shorter
+  than 1 s.
+- There are 85 unordered same-half handover pairs separated by 1–10 frames. Their windows
+  overlap and would form one class-1 block without class-2 overwriting. Windows 11 frames apart
+  also touch, without overlapping.
+- Transitions across the half boundary are excluded, but nearby target windows are not clipped
+  there. Two dead-ball windows spill into the other half, totaling nine frame incidences. No
+  handover window spills in these matches.
+- Synthetic cases confirm target overwriting. A handover d frames after a restart loses 11 − d
+  target frames for d = 1–10. At separations of at least 11 frames, the two windows do not
+  overlap. With two short possessions bracketed by stoppages, all 11 frames of the intervening
+  handover target can be overwritten.
+- Not shown: whether different targets change detector quality, short-spell recall, or spellF1.
+  That needs the planned comparison on clean evaluation. Not yet audited: blurring by wide
+  feature windows.
 
 ## José — missing-ball robustness and extra data
 
