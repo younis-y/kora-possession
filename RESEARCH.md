@@ -78,7 +78,32 @@ false predictions.
 - Count merges and splits from interval overlaps under a declared rule. Separate wrong-team
   fragments, false D interruptions, and complex cases.
 
-**Outcome:** —
+**Outcome:** Metric implemented in `kora/errors.py`. Empirical result pending.
+
+- Input contract: `analyse(y_true, y_pred, half, ball_seen, fps=25)` on frame-aligned codes
+  (0 H, 1 A, 2 D, 3 X). Each half is one contiguous block, and all spell and transition work
+  stays inside a half. Temporal metrics fill predicted X as `pm.evaluate` does. Frame metrics
+  count X as wrong.
+- `python -m kora.errors --predictions BUNDLE.npz` reads a local schema-v1 bundle of decoded
+  labels and never decodes, trains, or rebuilds features. A bundle is clean only if its stated
+  provenance is accurate. The loader checks schema and alignment, not fold exclusion.
+- The no-argument path needs `models/oof.npz` and exits with a clear message when it is absent.
+  Its output is labelled development OOF because the decoder settings were chosen on all
+  matches. The `oof-v3` release supplies these development predictions. They do not answer V1–V4.
+- Exact greedy pairs at each IoU replace the approximate `used` set. Matched counts equal the
+  official scorer's counts.
+- Counts per 45 minutes use total half time, D included. Signed count error is predicted minus true.
+- Associations: same-team spells linked when the intersection covers at least half of the
+  shorter spell. Graph components are 1:1, split, merge, complex, or isolated. They are not
+  official matches. Splits are typed by the predicted gap labels (wrong-team fragment, false
+  D interruption, mixed). Merges are typed by the true gap labels (missed opposite possession,
+  missed stoppage, mixed). Discarded weak overlaps are reported. These are same-team structural
+  diagnostics, not exhaustive counts of erased possessions. Truth H then A predicted all H gives
+  one association and one isolated true A, not a merge.
+- Checks: `tests/test_errors.py`, synthetic sequences only, compared with the vendored official
+  metrics. They cover perfect predictions, tied IoUs, collisions, each split and merge type,
+  many-to-many, weak overlaps, erased opposite possessions, adjacent halves, X handling,
+  normalisation, and bundle validation.
 
 ### [pending] V2: Are short possessions missing or mistimed?
 
@@ -89,7 +114,14 @@ false predictions.
 precision, and false predicted spells by duration. Recheck the reported one-fifth recall below
 one second on clean predictions.
 
-**Outcome:** —
+**Outcome:** Metric implemented in `kora/errors.py`. Empirical result pending.
+
+- Spells are matched per half at each IoU before grouping. Recall uses true duration groups.
+  Precision and false predicted spells use predicted duration groups, so one pair can fall in
+  different groups on each side. Counts are pooled, and ratios with a zero denominator print `n/a`.
+- Checks: group edges, cross-group pairs, empty groups, totals against the official scorer,
+  and extra fragments lowering precision without changing recall.
+- The one-fifth recall below one second still needs clean predictions.
 
 ### [pending] V3: Which transition types fail, and by how much?
 
@@ -100,7 +132,20 @@ recall, early/late bias, and median/p90 absolute timing errors. Match exact tran
 within each half at the official tolerances. Report errors within one second of each type,
 their share of all wrong frames, and overlapping windows.
 
-**Outcome:** —
+**Outcome:** Metric implemented in `kora/errors.py`. Empirical result pending.
+
+- Transitions are matched per half by exact (from, to) pair at 12 and 25 frames. Results are
+  grouped as H↔A, H/A→D, and D→H/A, with the six pairs as a breakdown. Latency is predicted
+  minus true frame (positive is late), pooled before computing median and p90.
+- Both ambiguity directions are reported: true events with several feasible predictions, and
+  predicted events with several feasible truths.
+- The official default (`typed="to"`) is printed separately as a reference.
+- Error windows are `[c−25, c+25)` around true transitions, clipped to the half and unioned
+  within each category. Exclusive rows, an overlapping row, and an outside row partition all
+  frames and wrong frames. Inclusive rows give the errors within one second of each category.
+  They overlap, so their shares can sum above 1. The union is a subtotal.
+- Checks: timing offsets at both tolerances, type confusion, transitions across adjacent
+  halves, both ambiguity cases, window overlap and clipping, and pooled quantiles.
 
 ### [pending] V4: How often is D predicted during live play?
 
@@ -109,7 +154,15 @@ their share of all wrong frames, and overlapping windows.
 **Experiment:** Report `false D frames / true live-play frames`, split by H/A and ball visibility.
 Measure the reverse error: H/A predicted on true D. Include numerators and denominators.
 
-**Outcome:** —
+**Outcome:** Metric implemented in `kora/errors.py`. Empirical result pending.
+
+- A per-half count matrix `[true H/A/D, ball visibility, raw prediction H/A/D/X]` gives
+  `false D / true live` by team and visibility, and `predicted H/A / true D` by visibility.
+  Each row shows numerator, denominator, and the remaining outcomes, which sum to the denominator.
+- Visibility must come from the copy the predictions were made on. In the training copies it is
+  simulated blackout, not challenge tracking.
+- Checks: hand-computed rows, X on live frames, zero denominators, and agreement with
+  `pm.confusion`.
 
 ### [pending] V5: Which decoder weights improve possession recovery?
 
@@ -148,7 +201,30 @@ dead-ball targets. Wide feature windows may blur nearby transitions.
 weights, and extra weight near short spells. Measure short-spell recall and false fragments
 at all five IoUs.
 
-**Outcome:** —
+**Outcome:** Read-only label audit done. The target experiment has not run.
+
+- Scope: `boundary.target` applied to the labels of the seven IDSSE training matches. No
+  features, models, or challenge data were used. The audit counts target labels only.
+- Of 2,351 handovers, 41 lose some of their 11 class-1 window frames to class 2 (1.7%). None is
+  fully erased. Two more are shortened only by clipping at the array end. Overwriting removes 187
+  of 25,341 handover-target frames (0.7%). After the `[::2]` subsampling in training, 90 of
+  12,635 are removed.
+- The affected handovers are concentrated near stoppages. 36 occur within 10 frames before a
+  stoppage and 5 within 10 frames after a restart. 38 of the 41 start a true possession shorter
+  than 1 s.
+- There are 85 unordered same-half handover pairs separated by 1–10 frames. Their windows
+  overlap and would form one class-1 block without class-2 overwriting. Windows 11 frames apart
+  also touch, without overlapping.
+- Transitions across the half boundary are excluded, but nearby target windows are not clipped
+  there. Two dead-ball windows spill into the other half, totaling nine frame incidences. No
+  handover window spills in these matches.
+- Synthetic cases confirm target overwriting. A handover d frames after a restart loses 11 − d
+  target frames for d = 1–10. At separations of at least 11 frames, the two windows do not
+  overlap. With two short possessions bracketed by stoppages, all 11 frames of the intervening
+  handover target can be overwritten.
+- Not shown: whether different targets change detector quality, short-spell recall, or spellF1.
+  That needs the planned comparison on clean evaluation. Not yet audited: blurring by wide
+  feature windows.
 
 ## José — missing-ball robustness and extra data
 
