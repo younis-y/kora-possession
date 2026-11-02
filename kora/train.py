@@ -63,7 +63,7 @@ def copies(match):
     train, ev = _copies(match)
     arrays = {f"X{i}": x.to_numpy() for i, (x, _) in enumerate(train)}
     arrays.update({f"y{i}": y for i, (_, y) in enumerate(train)})
-    np.savez(path, columns=np.array(train[0][0].columns), Xe=ev[0].to_numpy(), ye=ev[1], he=ev[2], **arrays)
+    np.savez(path, columns=np.array(train[0][0].columns, dtype="U64"), Xe=ev[0].to_numpy(), ye=ev[1], he=ev[2], **arrays)
     return train, ev
 
 
