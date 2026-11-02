@@ -6,7 +6,7 @@
 - Never commit match data or anything derived from it (`data/`, `*.npz` are ignored).
 
 ## How a change gets in
-1. Branch from `main`, open a PR. Nobody pushes to `main` directly.
+1. Branch from `main`, open a PR for any code, `models/` or README change. Only `RESEARCH.md` findings go straight to `main`.
 2. Score it and paste the leave-one-match-out spellF1 (mean, nested, per match) in the PR:
    - decoder or detector changes: `gh release download oof-v3 -D models` (training-match predictions),
      then `python -m kora.boundary`. Minutes, no retraining.
@@ -20,7 +20,7 @@ Each track keeps to its own files so branches don't conflict; anything else, say
 - Younis, clean evaluation: `kora/nested.py` (new), `build.sh`.
 - Vladymyr, error metrics and decoder: `kora/errors.py`, `kora/decode.py`, `kora/boundary.py`.
 - José, missing-ball robustness and extra data: `kora/degrade.py`, `kora/external.py`.
-- `RESEARCH.md`: edit only your own section.
+- `RESEARCH.md`: edit only your own section; push findings straight to `main`, even for unfinished work.
 
 ## Commits
 [Conventional Commits 1.0.0](https://www.conventionalcommits.org/en/v1.0.0/): `feat:`, `fix:`, `docs:`, `refactor:`,
