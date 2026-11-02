@@ -14,9 +14,12 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 ## Run
 
 ```bash
-.venv/bin/python -m kora.data               # parse the bundle once into data/cache (about 25 s)
-.venv/bin/python -m kora.profile            # descriptive profile of the data, markdown to stdout
-.venv/bin/python -m kora.run --out "Kora Analytics.csv"   # the submission (coming)
+.venv/bin/python -m kora.run --out "Kora Analytics.csv"   # submission from the committed models (about 15 s)
+shasum -a 256 -c models/submission.sha256                 # must print OK: identical to our submission
+./build.sh                                                # everything from scratch: download, train, decode, check
+.venv/bin/python -m kora.errors                           # where the score is lost, on the training matches
+.venv/bin/python -m kora.checks "Kora Analytics.csv"      # label-free sanity checks on the challenge output
 ```
 
 The match data is gated and never committed; `data/` and every derived array are gitignored.
+See `docs/method.md` for the method and `CONTRIBUTING.md` for how we work.
