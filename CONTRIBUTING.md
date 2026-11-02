@@ -8,8 +8,8 @@
 ## How a change gets in
 1. Branch from `main`, open a PR. Nobody pushes to `main` directly.
 2. Score it and paste the leave-one-match-out spellF1 (mean, nested, per match) in the PR:
-   - decoder or detector changes: put the shared `oof.npz` (training-match predictions, from the team
-     OneDrive) in `models/` and run `python -m kora.boundary`. Minutes, no retraining.
+   - decoder or detector changes: `gh release download oof-v3 -D models` (training-match predictions),
+     then `python -m kora.boundary`. Minutes, no retraining.
    - feature, degradation or training changes: run `./build.sh`.
 3. Merge only if it beats `main` on the mean and on at least 5 of the 7 matches.
 4. If the submission changes, update the hash: `shasum -a 256 "Kora Analytics.csv" > models/submission.sha256`,
