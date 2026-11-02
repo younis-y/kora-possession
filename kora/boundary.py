@@ -99,6 +99,7 @@ def main():
 
     change = dict(zip(MATCHES, Parallel(n_jobs=len(MATCHES))(delayed(fold)(m) for m in MATCHES)))
     rate = float(np.mean([(target(data[m][2], data[m][3]) == 1).mean() for m in MATCHES]))
+    np.savez_compressed(MODELS / "change_oof.npz", **change)          # for kora.errors; not committed
     print(f"detector folds done ({time.time() - t0:.0f} s)", flush=True)
 
     def score(m, cha, cd, w, beta):
