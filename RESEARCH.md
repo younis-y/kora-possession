@@ -238,7 +238,30 @@ live-play blackouts, and player-loss/close-up patterns. Use at least three fixed
 stochastic condition and identical masks for competing models. Report gap lengths and paired
 per-match/per-condition scores. Fix condition weights before evaluation.
 
-**Outcome:** —
+**Outcome:** Exploratory held-out tests on three German matches and seeds 11, 22, 33 show
+sensitivity to simulated ball gaps. The frame classifier was trained on the other six matches. The
+fixed plain-decoder settings were historically selected using all seven matches, so these are not Y1
+scores and cannot select a model.
+
+| Held-out match | Current gaps | Independent gaps | Heavier live gaps |
+| --- | --- | --- | --- |
+| J03WPY | 0.7085 / 0.6784 / 0.7021 | 0.6472 / 0.6249 / 0.6302 | 0.6595 / 0.6579 / 0.6656 |
+| J03WN1 | 0.6789 / 0.6778 / 0.6737 | 0.6207 / 0.5993 / 0.5803 | 0.6498 / 0.6242 / 0.5969 |
+| J03WMX | 0.6520 / 0.6727 / 0.6635 | 0.5772 / 0.6057 / 0.5753 | 0.5951 / 0.6213 / 0.5964 |
+
+Each entry is spellF1 for seeds 11 / 22 / 33. Player dropout is shared across these conditions but
+is label-conditioned. Independent and current conditions change both gap placement and rate. On
+J03WMX, a separate rearrangement preserved the number and lengths of ball gaps within each half:
+current 0.6520 / 0.6727 / 0.6635 versus rearranged 0.5289 / 0.5368 / 0.4925. The rearrangement
+changes alignment with player dropouts and retains label-conditioned gap lengths.
+
+One provisional J03WPY retraining run used independent ball gaps during training. Its
+independent-gap scores were 0.6809 / 0.6516 / 0.6645, versus 0.6472 / 0.6249 / 0.6302 for the
+current training simulation. Its current-gap scores were 0.6909 / 0.6618 / 0.6951, versus 0.7085 /
+0.6784 / 0.7021. This is one match, one training seed, and a fixed historical decoder; it is not a
+merge decision. Seven-match clean nested comparisons and player-loss sensitivity remain pending. Y1 artifacts need the
+held-out predictions, matching visibility masks, run metadata, and confirmation that decoder settings
+were selected without the held-out match.
 
 ### [pending] J2: Can player movement identify possession during ball gaps?
 
@@ -249,7 +272,13 @@ context. Compare main, auxiliary, and fused models on identical gaps: `<0.5`, `0
 `2–4`, and `4+` seconds. Tune visibility/gap-dependent fusion within training folds. Report gap
 errors and overall spellF1.
 
-**Outcome:** —
+**Outcome:** An exploratory player-only H/A model was trained with leave-one-match-out splits and
+tested using simulated gaps on all seven German matches, with seeds 11, 22, 33. Pooled over
+current-simulation live frames inside gaps, it got 58,612 / 69,479 frames correct (84.4%); the
+always-home baseline got 37,023 / 69,479 (53.3%). Counts repeat frames across seeds and are not
+independent samples. Both figures condition on the true frame being live. Gap scenarios select
+different frames; player-only predictions do not change when only the ball mask changes. Fusion,
+decoded spellF1, and clean nested comparison remain pending.
 
 ### [pending] J3: Does the domain comparison survive time- and match-separated splits?
 
@@ -259,7 +288,11 @@ training and evaluation.
 **Experiment:** Use separated challenge time blocks and match-aware source splits. Compare AUC
 and feature importance across splits before changing degradation or removing features.
 
-**Outcome:** —
+**Outcome:** On three source matches and one degradation seed, random-frame domain AUC was 1.000.
+Holding out one source match and one separately built challenge half gave 0.926–0.979 across six
+splits (mean 0.944). Both source and target features were built separately per half. This shows the
+samples are distinguishable, not which differences matter for possession. Match style, camera
+coverage, and other domain differences may contribute. The target data was unlabelled.
 
 ### [pending] J4: Does Metrica improve training despite different possession labels?
 
@@ -271,7 +304,15 @@ high-confidence event anchors followed by Sportec training against Sportec-only 
 Evaluate on the same held-out matches. Avoid treating full event-derived paths as hard labels
 without validating the mapping.
 
-**Outcome:** —
+**Outcome:** Metrica's three sample games were published before the 2024 challenge fixture. The
+pinned [2021
+snapshot](https://github.com/metrica-sports/sample-data/tree/e706dd506b360d69d9d123d5b8026e7294b13996)
+contains synchronized Game 3 events and tracking. Of 1,395 CARRY events, 14 opposing-team pairs
+overlap in their interiors, or 23 if touching endpoints count. An inclusive-endpoint audit found 75
+conflicted frames. Endpoint semantics and the mapping to the challenge possession definition remain
+unverified. The source invites community use and requests attribution but has no explicit standard
+licence; clarify reuse terms before depending on it for released training artifacts. No model
+comparison has run.
 
 ### [pending] J5: Are useful tracking measurements discarded?
 
@@ -280,7 +321,11 @@ without validating the mapping.
 **Experiment:** Confirm unused columns, units, and missing-value rules from provider metadata.
 Evaluate supported signals individually. Do not assume a column means confidence or speed.
 
-**Outcome:** —
+**Outcome:** The raw player and ball records have a third `s` field that is not retained by the
+model. Player metadata describes it as km/h, while the organiser guide describes player speed in
+m/s. The ball field is finite in 10.5% of all frames, versus 56.9% for ball x. Its meaning and units
+remain uncertain, and the external-match loader does not retain a directly equivalent player-speed
+field. No new signal was added to inference.
 
 ## Shared follow-ups
 
