@@ -1,23 +1,22 @@
-"""Make clean, corrected tracking look like the challenge's automatic tracking.
+"""Make clean, corrected tracking look like automatic tracking, using external measurements only.
 
-The training matches are official corrected tracking: every player, the ball on every frame. The
-challenge match is automatic tracking, and its gaps are not random. Measured on the challenge match
-with no labels (notes/2026-10-31-missingness.md): within each band of median player speed, the
-share of frames with the ball missing tracks the share of dead-ball frames in the training matches
-at the same speed. A two-component mixture fit gives
+The training matches (IDSSE) are corrected tracking: every player and the ball on every frame. The
+challenge match is automatic tracking, which loses the ball and players. Every number below comes from
+models/degrade_external.json, written by kora/missingness.py from the SkillCorner open data (automatic
+broadcast tracking with real detection gaps) and the IDSSE labels. No challenge data is used; see that
+module for the method and the provenance of each value.
 
-    P(ball missing | dead) ~ 0.80        P(ball missing | alive) ~ 0.04
-
-and frames with fewer than 15 tracked players sit almost entirely at walking pace (camera close-ups
-during stoppages). Positions themselves are as smooth as the corrected data (jitter 0.05 m vs 0.09 m,
-same median player speed), so no positional noise is added.
-
-Each training copy draws its knobs from ranges around those estimates (domain randomisation), so the
-model learns how much a missing ball means without being tied to one exact value.
+Each call draws one severity s ~ U(0, 1) and scales every process by it, so training copies span the
+two external extremes: clean corrected tracking (s = 0) and broadcast automatic tracking (s = 1).
 """
+import json
+from pathlib import Path
+
 import numpy as np
 
-FPS = 25
+from .features import FPS
+
+PARAMS = json.loads((Path(__file__).resolve().parent.parent / "models" / "degrade_external.json").read_text())
 
 
 def stretches(mask):
@@ -26,46 +25,56 @@ def stretches(mask):
     return list(zip(np.flatnonzero(d == 1), np.flatnonzero(d == -1)))
 
 
-def degrade(players, ball_xyz, label, rng):
+def draw(quantiles, rng):
+    """One value from an empirical distribution stored as evenly spaced quantiles."""
+    q = np.asarray(quantiles, float)
+    return float(np.interp(rng.random(), np.linspace(0, 1, len(q)), q))
+
+
+def degrade(players, ball_xyz, label, rng, severity=None):
+    p = PARAMS
     n, P, _ = players.shape
+    s = rng.random() if severity is None else severity
     out_p = players.copy()
     out_b = ball_xyz[:, :2].copy()
     dead = label == 2
     missing = np.zeros(n, bool)
 
-    # ball during stoppages: one blackout per dead stretch, mostly covering it
-    q = rng.uniform(0.80, 0.97)
-    for s, e in stretches(dead):
-        if rng.random() < q:
-            a = s + int(rng.uniform(-1.0, 2.0) * FPS)
-            b = e - int(rng.uniform(0.0, 3.0) * FPS)
-            missing[max(a, 0):max(b, 0)] = True
-    # ball in play: short occasional blackouts
+    # ball during stoppages: one blackout per dead stretch, offsets from the external stoppage proxy
+    for a, b in stretches(dead):
+        if rng.random() < s * p["p_miss_dead"]:
+            lo = a + int(draw(p["dead_start_offset_s_quantiles"], rng) * FPS)
+            hi = b - int(draw(p["dead_end_offset_s_quantiles"], rng) * FPS)
+            missing[lo:max(hi, lo)] = True
+    # ball in play: gaps with external live-gap lengths until the external share is reached
     alive_idx = np.flatnonzero(~dead)
-    share = rng.uniform(0.02, 0.06)
-    mean_len = rng.uniform(1.0, 4.0) * FPS
-    k = int(share * len(alive_idx) / mean_len)
-    for start in rng.choice(alive_idx, size=k, replace=False):
-        missing[start:start + int(rng.exponential(mean_len)) + 1] = True
+    budget = s * p["p_miss_alive"] * len(alive_idx)
+    while budget > 0 and len(alive_idx):
+        start = alive_idx[rng.integers(len(alive_idx))]
+        length = max(int(draw(p["live_gap_s_quantiles"], rng) * FPS), 1)
+        missing[start:start + length] = True
+        budget -= length
     out_b[missing] = np.nan
 
-    # players: tracks drop out now and then
-    vis_mean = rng.uniform(30, 150) * FPS
-    gap_mean = rng.uniform(1, 6) * FPS
+    # players: alternating visible and lost stretches; each lost stretch kept with probability s
+    vis_mean = p["player_visible_s_mean"] * FPS
     for j in range(P):
-        t = -int(rng.integers(0, int(vis_mean)))
+        t = -int(rng.integers(0, max(int(vis_mean), 1)))
         while t < n:
             t += int(rng.exponential(vis_mean)) + 1
-            g = int(rng.exponential(gap_mean)) + 1
-            out_p[max(t, 0):max(t + g, 0), j] = np.nan
+            g = int(draw(p["player_gap_s_quantiles"], rng) * FPS) + 1
+            if rng.random() < s:
+                out_p[max(t, 0):max(t + g, 0), j] = np.nan
             t += g
-    # camera close-ups in some stoppages: players far from the ball's last position vanish
-    zoom = rng.uniform(0.15, 0.4)
-    for s, e in stretches(dead):
-        if e - s > 4 * FPS and rng.random() < zoom:
-            c = np.nanmean(ball_xyz[s:e, :2], 0)
-            r = rng.uniform(15, 30)
-            far = np.linalg.norm(players[s:e] - c[None, None, :], axis=2) > r
-            seg = out_p[s:e]
-            seg[far] = np.nan
+    # camera close-ups in some long stoppages: players far from the ball vanish
+    radii = p["closeup_radius_m_quantiles"]
+    for a, b in stretches(dead):
+        if radii and b - a > p["closeup_min_s"] * FPS and rng.random() < s * p["closeup_prob"]:
+            c = np.nanmean(ball_xyz[a:b, :2], 0)
+            far = np.linalg.norm(players[a:b] - c[None, None, :], axis=2) > draw(radii, rng)
+            out_p[a:b][far] = np.nan
+    # measurement noise on observed positions
+    sd = s * p["position_noise_m"]
+    if sd > 0:
+        out_p += rng.normal(0, sd, out_p.shape).astype(out_p.dtype)
     return out_p, out_b
