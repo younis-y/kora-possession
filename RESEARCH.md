@@ -324,6 +324,14 @@ auxiliary rows changed the row-level internal early-stopping split and validatio
 A comparison with fixed German-only validation or fixed iterations and the Y1 evaluation is
 needed. No Metrica-trained model has been released.
 
+A follow-up used a fixed whole German match (J03WR9) for both models' early-stopping
+validation, five other German matches for fitting, and J03WPY as the untouched outer test.
+The Metrica anchors were used only in fitting. On the same seed-11 current simulated gaps,
+Sportec-only was 2,812 / 3,313 correct (84.88%); Sportec plus Metrica was 2,792 / 3,313
+(84.27%). The fits stopped at 128 and 107 iterations, respectively. This removes the differing
+validation-set confound in the earlier comparison but remains a single match and seed, with no
+fusion or spellF1 result. No change is selected; the full Y1 comparison remains necessary.
+
 ### [pending] J5: Are useful tracking measurements discarded?
 
 **Hypothesis:** Retaining only ball x/y may omit useful measurements.
