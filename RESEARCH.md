@@ -286,6 +286,16 @@ three seeds. The observed target duration distribution does not reveal whether e
 or dead and is not labelled validation. Test a label-independent duration-matched scenario before
 drawing conclusions from the independent-gap experiment.
 
+A duration-matched stress test sampled the unlabelled challenge gap lengths and fixed the pooled
+missing share per simulated half. In J03WPY, with seeds 11 / 22 / 33, current-gap spellF1 was
+0.7085 / 0.6784 / 0.7021 and duration-matched spellF1 was 0.5411 / 0.5347 / 0.5630. The simulated
+median gaps were 11.48 / 11.00 / 10.84 s. The generator independently places gaps, shortens the
+last sampled gap if needed, and does not reproduce any relationship with live/dead phases or
+player visibility. The classifier was trained on the other six matches, but the fixed plain-decoder
+settings were historically chosen using all seven. This is one exploratory held-out match, not
+Y1 or an estimate of the challenge score. Experiment code is on `soda/missing-ball-robustness` at
+`c4ce758`; exact input and code hashes were recorded locally.
+
 One provisional J03WPY retraining run used independent ball gaps during training. Its
 independent-gap scores were 0.6809 / 0.6516 / 0.6645, versus 0.6472 / 0.6249 / 0.6302 for the
 current training simulation. Its current-gap scores were 0.6909 / 0.6618 / 0.6951, versus 0.7085 /
