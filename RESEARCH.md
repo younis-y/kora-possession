@@ -318,6 +318,18 @@ and inner validation match k, detector-training features for another match j can
 stage-1 model trained on k. Inner prior and boundary rate also include k. This may bias inner
 selection scores, but does not by itself put outer match m into training. Its effect is unmeasured.
 
+**Run J1-mixed (pre-registered 2026-11-03, before any score):** training `current` vs `mixed` (even
+copies current gaps, odd copies label-independent gaps), all seven German matches held out in turn,
+fixed plain decoder (alpha 0, H/A 8, D 32) for both arms. Evaluation conditions: current,
+independent, live, shuffled_current; seeds 11, 22, 33; no challenge-derived condition. Primary
+score per match: equal-weight mean spellF1 over the 12 condition-seed pairs. Mixed passes if the
+seven-match mean is higher and at least 5 of 7 matches improve. Reported, not deciding: current
+condition alone. This uses the pre-Y5 degradation; a pass makes `mixed` a candidate variant
+against B0, not a merge. `--duration-matched` now reads `models/degrade_external.json`, never
+the challenge match.
+
+**Outcome:** —
+
 ### [pending] J2: Can player movement identify possession during ball gaps?
 
 **Hypothesis:** Player geometry and movement can provide evidence without reconstructing ball coordinates.
@@ -337,7 +349,7 @@ decoded spellF1, and clean nested comparison remain pending. The saved run manif
 records a blackout evaluator hash different from this branch; the earlier source snapshot was not
 saved. Exact rerun reproducibility of these results has not been established.
 
-### [pending] J3: Does the domain comparison survive time- and match-separated splits?
+### [verified] J3: Does the domain comparison survive time- and match-separated splits?
 
 **Hypothesis:** Random frame splitting in `kora.shift` gives correlated neighboring frames to
 training and evaluation.
@@ -351,7 +363,11 @@ splits (mean 0.944). Both source and target features were built separately per h
 samples are distinguishable, not which differences matter for possession. Match style, camera
 coverage, and other domain differences may contribute. The target data was unlabelled.
 
-### [pending] J4: Does Metrica improve training despite different possession labels?
+**Decision (2026-11-03):** closed. Random frame splits overstate the shift (1.000 vs 0.944), but the
+domains stay separable under separated splits. Under the 3 Nov rules no degradation value or feature
+choice may come from this comparison; Y5 re-derives degradation from external data instead.
+
+### [dropped] J4: Does Metrica improve training despite different possession labels?
 
 **Hypothesis:** Extra tracking can help without treating event-derived ownership as equivalent ground truth.
 
@@ -409,7 +425,12 @@ The audit and comparison verify pinned file hashes. The comparison also requires
 German matches cached by `python -m kora.external`. These commands are research only, not the
 submission build or the clean nested evaluation. Metrica reuse terms remain unresolved.
 
-### [pending] J5: Are useful tracking measurements discarded?
+**Decision (2026-11-03):** dropped. Two matched comparisons gave +0.54 and −0.61 points of gap-frame
+team accuracy, which is no reliable gain. The sample data has no standard licence, and the rules
+require rights to every dataset. SkillCorner open data (MIT, Y5) now covers external automatic
+tracking. The research code stays on `soda/missing-ball-robustness` and is not merged.
+
+### [dropped] J5: Are useful tracking measurements discarded?
 
 **Hypothesis:** Retaining only ball x/y may omit useful measurements.
 
@@ -421,6 +442,10 @@ model. Player metadata describes it as km/h, while the organiser guide describes
 m/s. The ball field is finite in 10.5% of all frames, versus 56.9% for ball x. Its meaning and units
 remain uncertain, and the external-match loader does not retain a directly equivalent player-speed
 field. No new signal was added to inference.
+
+**Decision (2026-11-03):** dropped. The IDSSE training data has no equivalent field, so a model could
+learn its meaning only from the challenge match, which the 3 Nov rules forbid. Player speed is
+already derived from positions.
 
 ## Shared follow-ups
 
