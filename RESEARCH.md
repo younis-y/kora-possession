@@ -87,6 +87,63 @@ availability. Use `hashlib` if portability requires it. Record environment and a
 
 **Outcome:** —
 
+### [pending] Y5: Compliance rebase (organiser rules, 3 Nov 2026), baseline B0
+
+**Why:** the organisers' clarification of 3 Nov requires every trained, fitted, calibrated or tuned
+parameter to come from external data. Several degradation values and one feature-removal decision
+were measured on the unlabelled challenge tracking (old `degrade.py` docstring, `shift.py`), so the
+Y1 score of 0.7169 is not a compliant baseline.
+
+**Change:** `kora/missingness.py` measures every degradation value on external data only
+(SkillCorner open data, 20 matches, for real tracking gaps; IDSSE for positional smoothness) and
+writes `models/degrade_external.json`.
+
+**Measurement rule (decided 2026-11-03, owner):** every quantity is measured on every frame of the
+external stream, camera cuts and replays included; a frame with no SkillCorner possession owner
+stands in for a stoppage. Two estimates of ball loss were seen before this rule was chosen:
+
+| estimate | P(ball missing \| stoppage) | P(ball missing \| live) | why not / why |
+| --- | ---: | ---: | --- |
+| camera-on frames only, speed-band mixture with IDSSE dead rate | 0.14 | 0.024 | drops exactly the stoppage frames where tracking loses the ball |
+| **every frame (chosen)** | **0.79** | **0.077** | one rule for all quantities; what automatic tracking delivers |
+
+The organisers' documentation states the challenge ball is missing on 41% of graded frames; the
+chosen estimate's overall share is 40%. We record that we knew this when choosing, and the tech doc
+says so. Other values: live ball-gap median 2.5 s (p90 9.5 s), player visible 11.2 s mean, player
+gap median 7.3 s, close-up probability 0.70 per long stoppage, positional noise 0 (SkillCorner is
+smoother than IDSSE). `kora/degrade.py` reads only that file. Each training copy draws a
+severity s ~ U(0, 1) that scales every process from clean IDSSE (0) to SkillCorner broadcast (1).
+The duration-matched stress test on José's branch still samples challenge gap lengths; it must move to `gap_s_quantiles` / `missing_share` in the external JSON before it is used again. Caches are keyed by a hash of
+the feature and degradation code plus the external parameters (`kora/variant.py`).
+
+**Run R0 (pre-registered 2026-11-03):** `python -m kora.nested --variant b0`. This is the new
+baseline B0. No keep rule applies: it replaces Y1 because Y1 is not compliant. Inner HSMM-vs-plain
+rule changes from 5 of 6 to 4 of 6 inner wins from this run on.
+
+**Outcome:** —
+
+### [pending] Y6: Do touch and handover features recover short possessions? (R1, R2)
+
+**Hypothesis:** oracle headroom on Y1 predictions (`notes/2026-11-03-headroom.py`): inserting missed
+possessions under 2 s is worth +0.129, far more than any other error type. Those possessions start
+with a touch, which the v3 features see only through ±4-frame averages.
+
+**Candidates (pre-registered 2026-11-03, frozen before any outer score is seen):**
+
+- R1 `touch`: B0 + `kora/touch.py` (ball velocity change over ±2 frames, per-team touch strength,
+  touch events, last/next touch team, touch counts in 1-4 s windows, same-team touch chain, 5- and
+  9-frame windows). Touch threshold 2.7 m/s = 95th percentile of free-flight velocity change in
+  IDSSE live play, label-free.
+- R2 `touch_bal`: R1 + possession-balanced sample weights, λ = 0.5 (each possession weighs the
+  same, as in spellF1).
+
+**Decision rule:** each candidate against B0 with `python -m kora.compare b0 <variant>`: keep if
+mean spellF1 is higher and at least 5 of 7 matches improve. R2 is compared with B0 and with R1;
+it is kept only if it also passes against R1. Secondary, reported but not deciding: recall under
+2 s, count ratio, spellF1 per IoU.
+
+**Outcome:** —
+
 ## Vladymyr ([research/vladymyr-decoder](https://github.com/younis-y/kora-possession/tree/research/vladymyr-decoder)) — error metrics and decoder
 
 ### [pending] V1: Are possessions merged, split, or miscounted?
