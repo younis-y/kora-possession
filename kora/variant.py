@@ -33,6 +33,8 @@ VARIANTS = {
     "b0_rand": {"eval_rand": True},                   # J6 random-gap test: evaluation copies get them too
     "mixed_rand": {"mixed": True, "eval_rand": True},
     "v5_wide": {"decoder": {"hsmm_grid": V5_HSMM_GRID}},
+    # RESEARCH.md V6 round 1: B0 settings with handover-only boundary bonuses.
+    "v6_ha_only": {"decoder": {"hsmm_grid": [s + (True,) for s in V5_HSMM_GRID[:54]]}},
 }
 PRODUCTION = "b0"
 FEATURE_KEYS = ("touch", "mixed", "eval_rand")
