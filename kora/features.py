@@ -13,6 +13,8 @@ Design rules:
 import numpy as np
 import pandas as pd
 
+from .variant import CONFIG
+
 FPS = 25
 HALF_L, HALF_W = 52.5, 34.0
 CAP_S = 120.0
@@ -184,6 +186,9 @@ def build(players, team, ball, section):
             p, q = nanroll(f[k], w, "p"), nanroll(f[k], w, "f")
             f[f"{k}_p{w}"], f[f"{k}_f{w}"] = p, q
             f[f"{k}_j{w}"] = q - p
+    if CONFIG.get("touch"):              # optional touch/handover features (kora/touch.py)
+        from .touch import add
+        add(f, vb)
     return pd.DataFrame({k: np.asarray(v, dtype=np.float32) for k, v in f.items()})
 
 
