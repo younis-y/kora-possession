@@ -9,12 +9,20 @@ models/degrade_external.json, and the feature switches), so an edited file can n
 stale cache. Stage-1 caches add the training switches.
 """
 import hashlib
+import itertools
 import json
 import os
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+
+# RESEARCH.md V5 round 1: preserve B0 grid order before appending wider settings.
+V5_HSMM_GRID = list(itertools.product((2, 4, 8), (8, 16), (2, 3, 4), (2, 3, 4)))
+V5_HSMM_GRID += [
+    setting for setting in itertools.product((1, 2, 4, 8), (8, 16, 32), (2, 3, 4), (2, 3, 4, 6, 8))
+    if setting not in V5_HSMM_GRID
+]
 
 VARIANTS = {
     "b0": {},                                         # compliant baseline: rebased degradation, v3 features
@@ -24,6 +32,7 @@ VARIANTS = {
     "mixed": {"mixed": True},                         # J6: odd training copies get label-free ball gaps
     "b0_rand": {"eval_rand": True},                   # J6 random-gap test: evaluation copies get them too
     "mixed_rand": {"mixed": True, "eval_rand": True},
+    "v5_wide": {"decoder": {"hsmm_grid": V5_HSMM_GRID}},
 }
 PRODUCTION = "b0"
 FEATURE_KEYS = ("touch", "mixed", "eval_rand")
