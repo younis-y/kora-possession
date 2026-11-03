@@ -98,27 +98,54 @@ Y1 score of 0.7169 is not a compliant baseline.
 (SkillCorner open data, 20 matches, for real tracking gaps; IDSSE for positional smoothness) and
 writes `models/degrade_external.json`.
 
-**Measurement rule (decided 2026-11-03, owner):** every quantity is measured on every frame of the
-external stream, camera cuts and replays included; a frame with no SkillCorner possession owner
-stands in for a stoppage. Two estimates of ball loss were seen before this rule was chosen:
+**Measurement rule (owner chose every frame on 2026-11-03; replaced the same day by the pre-registered
+check below):** a frame with no SkillCorner possession owner stands in for a stoppage. Estimates of
+ball loss seen before any choice:
 
-| estimate | P(ball missing \| stoppage) | P(ball missing \| live) | why not / why |
-| --- | ---: | ---: | --- |
-| camera-on frames only, speed-band mixture with IDSSE dead rate | 0.14 | 0.024 | drops exactly the stoppage frames where tracking loses the ball |
-| **every frame (chosen)** | **0.79** | **0.077** | one rule for all quantities; what automatic tracking delivers |
+| estimate | P(ball missing \| stoppage) | P(ball missing \| live) | overall share |
+| --- | ---: | ---: | ---: |
+| camera-on frames, speed-band mixture with IDSSE dead rate (first draft) | 0.14 | 0.024 | |
+| every frame of both periods, cuts and replays included (`degrade_external_all.json`) | 0.79 | 0.077 | 0.40 |
+| **frames with a detected player (`degrade_external.json`, in use)** | **0.23** | **0.015** | **0.057** |
 
-The organisers' documentation states the challenge ball is missing on 41% of graded frames; the
-chosen estimate's overall share is 40%. We record that we knew this when choosing, and the tech doc
-says so. Other values: live ball-gap median 2.5 s (p90 9.5 s), player visible 11.2 s mean, player
-gap median 7.3 s, close-up probability 0.70 per long stoppage, positional noise 0 (SkillCorner is
-smoother than IDSSE). `kora/degrade.py` reads only that file. Each training copy draws a
+The organisers' documentation states the challenge ball is missing on 41% of graded frames. We knew
+this when the owner first chose every frame (overall share 40%), which is why the choice was handed to
+the external-only check. In-use values: close-up probability 0.026 per long stoppage, player visible
+16.8 s mean, positional noise 0 (SkillCorner is smoother than IDSSE). `kora/degrade.py` reads only that file. Each training copy draws a
 severity s ~ U(0, 1) that scales every process from clean IDSSE (0) to SkillCorner broadcast (1).
 The duration-matched stress test on José's branch still samples challenge gap lengths; it must move to `gap_s_quantiles` / `missing_share` in the external JSON before it is used again. Caches are keyed by a hash of
 the feature and degradation code plus the external parameters (`kora/variant.py`).
 
-**Run R0 (pre-registered 2026-11-03):** `python -m kora.nested --variant b0`. This is the new
-baseline B0. No keep rule applies: it replaces Y1 because Y1 is not compliant. Inner HSMM-vs-plain
-rule changes from 5 of 6 to 4 of 6 inner wins from this run on.
+**Which estimate: external-only rule (pre-registered 2026-11-03, before running; raised by Vladymyr).**
+Nested CV cannot choose between the estimates: each variant is graded on evaluation copies degraded its
+own way. `python -m kora.missingness --check` degrades the seven IDSSE matches at full severity with each
+candidate (`degrade_external.json` every frame, `degrade_external_camera.json` frames with a detected
+player, both with the no-owner stoppage proxy), builds the missingness features (`b_seen`, `t_since`,
+`t_until`, `nH`, `nA` and every `b_seen_*` window, one frame per second) and trains a classifier to tell
+them from real SkillCorner tracking. Seven folds each hold out one IDSSE match and every 7th SkillCorner
+match. **Lower mean AUC wins; a difference under 0.01 keeps the every-frame rule.** If the camera-on
+candidate wins, R0 is rerun in full with it.
+
+**Check result (2026-11-03, commit b32a9d1):** camera on wins. Mean AUC **0.874** (folds 0.846 0.894
+0.892 0.875 0.848 0.880 0.881) vs every frame **0.960** (0.957 0.980 0.958 0.960 0.940 0.959 0.963),
+lower on all 7 folds. Camera on is now `models/degrade_external.json`; every frame is kept as
+`degrade_external_all.json`. Both still separate easily from real tracking (AUC well above 0.5).
+
+**Fix after the check (bug, not a choice):** the camera-on file had positional noise 0.32 m because
+dropping cut frames joined positions across each cut, and the joins were scored as jitter. Without the
+cross-join terms the variance equals the full stream's (0.00021), so noise is now measured before any
+join and is 0, as in the every-frame file. The check's features do not use positions, so the decision
+is unchanged. No other value moved.
+
+**Inner HSMM rule (corrected 2026-11-03, raised by Vladymyr).** The change to 4 of 6 was motivated by
+the J03WPY outer result in Y1, which is selection on an outer score. The reference stays at **5 of 6**;
+4 of 6 is the exploratory variant `b0_w4`. Grids and the rule now come from `kora.variant.DECODER`.
+
+**Run R0 (2026-11-03, 13:58-16:34, commit 1cd8d1e code, features f971ad3ea2e):** ran with 4 of 6 before the
+correction, so it is the `b0_w4` result: clean spellF1 **0.6889 ± 0.0224**, per match 0.710 0.661 0.669
+0.676 0.674 0.714 0.718 (HSMM on all 7 folds). It used the every-frame degradation, so after the check
+it is a historical result, not comparable with B0. B0 (5 of 6, camera-on degradation) is a full rerun,
+and R1/R2 follow on the same degradation.
 
 **Outcome:** —
 

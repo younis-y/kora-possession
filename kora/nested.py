@@ -10,8 +10,8 @@ and the plain decoder settings were fit on all seven. Here, per outer match m:
    on all six (the kora.train fold, reused from its cache).
 2. prior, plain decoder grid, detector (inner leave-one-out for selection, all six for m), rate,
    duration prior and the HSMM grid, all on the six inner matches.
-3. the HSMM is used on m only if it beats the plain decoder on the inner mean and on at least 4 of
-   the 6 inner matches (pre-registered 2026-11-03; 5 of 6 rejected a better decoder on J03WPY).
+3. the HSMM is used on m only if it beats the plain decoder on the inner mean and on at least
+   `inner_wins` of the 6 inner matches (default 5; grids and the rule come from kora.variant.decoder).
 
     python -m kora.nested --variant b0     # a few hours on first run (stage-1 folds are cached)
 
@@ -34,12 +34,15 @@ from .decode import decode, decode_hsmm, log_duration
 from .external import MATCHES
 from .train import (FEATURE_VERSION, GRID_ALPHA, GRID_D, GRID_HA, MODELS, SEED, STAGE1_VERSION, SUBSAMPLE,
                     TRAIN_COPIES, copies, fit_classifier, segments_of)
-from .variant import CONFIG, NAME, VARIANTS
+from .variant import CONFIG, NAME, VARIANTS, decoder
 from .vendor import possession_metrics as pm
 
 warnings.filterwarnings("ignore", category=RuntimeWarning)
-PLAIN = [(a, h, d) for a in GRID_ALPHA for h in GRID_HA for d in GRID_D]
-INNER_WINS = 4          # HSMM kept on the outer match if it beats plain on the inner mean and >= 4 of 6
+DECODER = decoder()
+PLAIN = [tuple(s) for s in DECODER["plain_grid"] or
+         [(a, h, d) for a in GRID_ALPHA for h in GRID_HA for d in GRID_D]]
+HSMM = [tuple(s) for s in DECODER["hsmm_grid"] or GRID]
+INNER_WINS = DECODER["inner_wins"]   # HSMM kept if it beats plain on the inner mean and on >= this many of 6
 
 
 def scores(y, pred, half):
@@ -124,20 +127,20 @@ def main():
 
         plain = np.array(Parallel(n_jobs=-1)(delayed(plain_scores)(P, yi, hi, prior, s) for s in PLAIN))
         bp = int(plain.mean(1).argmax())
-        hs = np.array(Parallel(n_jobs=-1)(delayed(hsmm_scores)(P, C, yi, hi, prior, rate, g) for g in GRID))
+        hs = np.array(Parallel(n_jobs=-1)(delayed(hsmm_scores)(P, C, yi, hi, prior, rate, g) for g in HSMM))
         bh = int(hs.mean(1).argmax())
         keep = bool(hs[bh].mean() > plain[bp].mean() and (hs[bh] > plain[bp]).sum() >= INNER_WINS)
 
         ld = log_duration([r for k in ins for r in runs_of(y[k], half[k])])
         seg = segments_of(half[m])
         pred_plain = decode(outer[m], seg, prior, *PLAIN[bp])
-        pred_hsmm = decode_hsmm(outer[m], change[m, m], seg, prior, ld, *GRID[bh], rate)
+        pred_hsmm = decode_hsmm(outer[m], change[m, m], seg, prior, ld, *HSMM[bh], rate)
         pred = pred_hsmm if keep else pred_plain
         s, s_plain, s_hsmm = scores(y[m], pred, half[m]), scores(y[m], pred_plain, half[m]), scores(y[m], pred_hsmm, half[m])
         folds[m] = {
             "inner_matches": ins, "decoder": "hsmm" if keep else "plain",
             "plain": dict(zip(("alpha", "cost_ha", "cost_d"), PLAIN[bp]), inner_mean=float(plain[bp].mean())),
-            "hsmm": dict(zip(("cost_ha", "cost_d", "w_dur", "beta"), GRID[bh]), inner_mean=float(hs[bh].mean()), rate=rate),
+            "hsmm": dict(zip(("cost_ha", "cost_d", "w_dur", "beta"), HSMM[bh]), inner_mean=float(hs[bh].mean()), rate=rate),
             "prior": prior.tolist(),
             "spell_f1": s["mean_f1"], "spell_f1_per_iou": {str(t): v["f1"] for t, v in s["per_iou"].items()},
             "n_true": s["n_gt"], "n_pred": s["n_pred"],
@@ -157,7 +160,7 @@ def main():
                           "Ball and player gaps are simulated from external measurements (kora/degrade.py), "
                           "not challenge tracking.",
             "commit": commit, "dirty": dirty, "seed": SEED, "variant": NAME, "config": CONFIG,
-            "feature_version": FEATURE_VERSION, "stage1_version": STAGE1_VERSION, "inner_wins": INNER_WINS,
+            "feature_version": FEATURE_VERSION, "stage1_version": STAGE1_VERSION, "inner_wins": INNER_WINS, "decoder": DECODER,
             "train_copies": TRAIN_COPIES, "subsample": SUBSAMPLE}
     summary = {**meta, "spell_f1_mean": float(f1.mean()), "spell_f1_std": float(f1.std()),
                "spell_f1_plain_mean": float(np.mean([folds[m]["spell_f1_plain"] for m in MATCHES])),
