@@ -31,6 +31,21 @@ def draw(quantiles, rng):
     return float(np.interp(rng.random(), np.linspace(0, 1, len(q)), q))
 
 
+def random_ball(ball_xyz, half, rng):
+    """Ball hidden by external-length gaps placed without labels, up to the external missing share
+    of each half (RESEARCH.md J6). Overlaps are allowed, so the realised share is a little lower."""
+    out = ball_xyz[:, :2].copy()
+    for h in np.unique(half):
+        idx = np.flatnonzero(half == h)
+        budget = PARAMS["missing_share"] * len(idx)
+        while budget > 0:
+            start = idx[rng.integers(len(idx))]
+            length = max(int(draw(PARAMS["gap_s_quantiles"], rng) * FPS), 1)
+            out[start:min(start + length, idx[-1] + 1)] = np.nan
+            budget -= length
+    return out
+
+
 def degrade(players, ball_xyz, label, rng, severity=None):
     p = PARAMS
     n, P, _ = players.shape
