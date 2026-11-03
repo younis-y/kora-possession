@@ -21,9 +21,12 @@ VARIANTS = {
     "b0_w4": {"decoder": {"inner_wins": 4}},          # exploratory: HSMM kept on 4 of 6 inner wins (Y5)
     "touch": {"touch": True},                         # R1: touch and handover features
     "touch_bal": {"touch": True, "balance": 0.5},     # R2: R1 + possession-balanced sample weights
+    "mixed": {"mixed": True},                         # J6: odd training copies get label-free ball gaps
+    "b0_rand": {"eval_rand": True},                   # J6 random-gap test: evaluation copies get them too
+    "mixed_rand": {"mixed": True, "eval_rand": True},
 }
 PRODUCTION = "b0"
-FEATURE_KEYS = ("touch",)
+FEATURE_KEYS = ("touch", "mixed", "eval_rand")
 TRAIN_KEYS = ("balance",)
 
 # Decoder selection in kora.nested. A variant overrides any key under "decoder"; nothing here touches the

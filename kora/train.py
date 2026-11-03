@@ -19,7 +19,7 @@ from sklearn.ensemble import HistGradientBoostingClassifier
 
 from .data import cache_dir
 from .decode import decode
-from .degrade import degrade
+from .degrade import degrade, random_ball
 from .external import MATCHES, load
 from .features import build, mirror
 from .variant import CONFIG, feature_version, stage1_version
@@ -73,13 +73,17 @@ def _copies(match):
     d = load(match)
     rng = np.random.default_rng([SEED, list(MATCHES).index(match)])
     train = []
-    for _ in range(TRAIN_COPIES):
+    for i in range(TRAIN_COPIES):
         p, b = degrade(d["players"], d["ball"], d["label"], rng)
+        if CONFIG.get("mixed") and i % 2:       # own rng, so the b0 draws stay identical
+            b = random_ball(d["ball"], d["half"], np.random.default_rng([SEED, list(MATCHES).index(match), i]))
         train.append((build(p, d["team"], b, d["half"]), d["label"]))
         pm_, tm_, bm_ = mirror(p, d["team"], b)
         y = d["label"].copy(); y[y < 2] = 1 - y[y < 2]
         train.append((build(pm_, tm_, bm_, d["half"]), y))
     p, b = degrade(d["players"], d["ball"], d["label"], rng)
+    if CONFIG.get("eval_rand"):
+        b = random_ball(d["ball"], d["half"], np.random.default_rng([SEED, list(MATCHES).index(match), TRAIN_COPIES]))
     evaluation = (build(p, d["team"], b, d["half"]), d["label"], d["half"])
     return train, evaluation
 

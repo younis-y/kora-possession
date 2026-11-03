@@ -367,7 +367,7 @@ at all five IoUs.
 
 ## José — missing-ball robustness and extra data
 
-### [pending] J1: Does the score depend on one blackout simulation?
+### [verified] J1: Does the score depend on one blackout simulation?
 
 **Hypothesis:** Label-conditioned gaps may reward an unrealistic association between missing ball
 and dead ball.
@@ -433,7 +433,61 @@ and inner validation match k, detector-training features for another match j can
 stage-1 model trained on k. Inner prior and boundary rate also include k. This may bias inner
 selection scores, but does not by itself put outer match m into training. Its effect is unmeasured.
 
-### [pending] J2: Can player movement identify possession during ball gaps?
+**Run J1-mixed (pre-registered 2026-11-03, before any score):** training `current` vs `mixed` (even
+copies current gaps, odd copies label-independent gaps), all seven German matches held out in turn,
+fixed plain decoder (alpha 0, H/A 8, D 32) for both arms. Evaluation conditions: current,
+independent, live, shuffled_current; seeds 11, 22, 33; no challenge-derived condition. Primary
+score per match: equal-weight mean spellF1 over the 12 condition-seed pairs. Mixed passes if the
+seven-match mean is higher and at least 5 of 7 matches improve. Reported, not deciding: current
+condition alone. This uses the pre-Y5 degradation; a pass makes `mixed` a candidate variant
+against B0, not a merge. `--duration-matched` now reads `models/degrade_external.json`, never
+the challenge match.
+
+**Outcome (2026-11-03, commit e0c22fd):** mixed passes the pre-registered rule: primary score
+**0.6480 vs 0.6337 (+0.0144), better on 7 of 7 matches** (+0.006 to +0.028). It costs a little
+on the current simulation alone: 0.6993 vs 0.7031 (−0.004, 4 of 7).
+
+| condition (mean of 7 matches × 3 seeds) | current training | mixed training |
+| --- | ---: | ---: |
+| current | 0.7031 | 0.6993 |
+| independent | 0.6352 | 0.6589 |
+| live | 0.6534 | 0.6679 |
+| shuffled_current | 0.5430 | 0.5661 |
+
+The plain decoder is fixed and its settings were chosen on all seven matches in the old pipeline,
+so these are paired comparisons, not nested scores. Degradation is pre-Y5. Next: register `mixed`
+as a variant on B0 (label-independent gaps on odd training copies) and score it with
+`kora.nested` + `kora.compare` after R0. Logs: `data/j1-mixed/` (local).
+
+### [pending] J6: Does mixed training beat B0 when the ball goes missing at random?
+
+**Hypothesis:** J1's gain carries over to the external degradation (Y5): training copies whose ball
+gaps ignore the labels make the model less dependent on "ball missing means stoppage".
+
+**Candidates (pre-registered 2026-11-03, before any code or outer score):**
+
+- `mixed`: production variant + odd training copies get random ball gaps instead of the degraded
+  ball mask. Players stay degraded as in B0.
+- Random gaps: `kora.degrade.random_ball`, lengths drawn from `gap_s_quantiles`, placed uniformly
+  without labels in each half until `missing_share` of its frames is spent (overlaps allowed, so the
+  realised share is a little lower); both values from `models/degrade_external.json` (SkillCorner,
+  external). Own seed per match and copy, so the B0 draws stay identical. J1 used 2 s geometric
+  gaps instead; this run uses the external profile. (Amended before any code or run: first draft
+  named `kora.blackout.duration_matched_mask`, which is not on `main`.)
+- Random-gap test: `b0_rand` and `mixed_rand` are `b0` and `mixed` with the held-out (and inner)
+  evaluation copy masked the same way. Decoder selection then also sees random gaps.
+- If R1/R2 change `PRODUCTION`, the same switches go on top of the new production variant.
+
+**Decision rule (agreed with Younis):** keep `mixed` if both hold:
+
+1. `python -m kora.compare b0_rand mixed_rand`: better on at least 5 of 7 matches.
+2. `python -m kora.compare b0 mixed`: mean spellF1 drops by no more than 0.01.
+
+Secondary, reported but not deciding: means, short-possession recall, count ratio.
+
+**Outcome:** —
+
+### [dropped] J2: Can player movement identify possession during ball gaps?
 
 **Hypothesis:** Player geometry and movement can provide evidence without reconstructing ball coordinates.
 
@@ -452,7 +506,12 @@ decoded spellF1, and clean nested comparison remain pending. The saved run manif
 records a blackout evaluator hash different from this branch; the earlier source snapshot was not
 saved. Exact rerun reproducibility of these results has not been established.
 
-### [pending] J3: Does the domain comparison survive time- and match-separated splits?
+**Decision (2026-11-03):** dropped. On the same 69,479 live gap frames (current simulation, seven
+matches, seeds 11/22/33), the main classifier gets 59,625 right (85.8%) and the player-only model
+58,612 (84.4%); with mixed training the main model gets 86.2%. The main model already uses the
+player signal, so a fusion has little to add. Fusion itself was not tested.
+
+### [verified] J3: Does the domain comparison survive time- and match-separated splits?
 
 **Hypothesis:** Random frame splitting in `kora.shift` gives correlated neighboring frames to
 training and evaluation.
@@ -466,7 +525,11 @@ splits (mean 0.944). Both source and target features were built separately per h
 samples are distinguishable, not which differences matter for possession. Match style, camera
 coverage, and other domain differences may contribute. The target data was unlabelled.
 
-### [pending] J4: Does Metrica improve training despite different possession labels?
+**Decision (2026-11-03):** closed. Random frame splits overstate the shift (1.000 vs 0.944), but the
+domains stay separable under separated splits. Under the 3 Nov rules no degradation value or feature
+choice may come from this comparison; Y5 re-derives degradation from external data instead.
+
+### [dropped] J4: Does Metrica improve training despite different possession labels?
 
 **Hypothesis:** Extra tracking can help without treating event-derived ownership as equivalent ground truth.
 
@@ -506,7 +569,30 @@ Sportec-only was 2,812 / 3,313 correct (84.88%); Sportec plus Metrica was 2,792 
 validation-set confound in the earlier comparison but remains a single match and seed, with no
 fusion or spellF1 result. No change is selected; the full Y1 comparison remains necessary.
 
-### [pending] J5: Are useful tracking measurements discarded?
+Research tools on this branch need the pinned Game 3 files in the ignored data directory:
+
+```bash
+revision=e706dd506b360d69d9d123d5b8026e7294b13996
+base="https://raw.githubusercontent.com/metrica-sports/sample-data/$revision/data/Sample_Game_3"
+mkdir -p "data/external/metrica/$revision"
+for file in Sample_Game_3_events.json Sample_Game_3_metadata.xml Sample_Game_3_tracking.txt; do
+  curl -fL "$base/$file" -o "data/external/metrica/$revision/$file"
+done
+.venv/bin/python -m kora.metrica_anchors
+.venv/bin/python -m kora.metrica_tracking
+OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 .venv/bin/python -m kora.metrica_eval
+```
+
+The audit and comparison verify pinned file hashes. The comparison also requires the seven
+German matches cached by `python -m kora.external`. These commands are research only, not the
+submission build or the clean nested evaluation. Metrica reuse terms remain unresolved.
+
+**Decision (2026-11-03):** dropped. Two matched comparisons gave +0.54 and −0.61 points of gap-frame
+team accuracy, which is no reliable gain. The sample data has no standard licence, and the rules
+require rights to every dataset. SkillCorner open data (MIT, Y5) now covers external automatic
+tracking. The research code stays on `soda/missing-ball-robustness` and is not merged.
+
+### [dropped] J5: Are useful tracking measurements discarded?
 
 **Hypothesis:** Retaining only ball x/y may omit useful measurements.
 
@@ -518,6 +604,10 @@ model. Player metadata describes it as km/h, while the organiser guide describes
 m/s. The ball field is finite in 10.5% of all frames, versus 56.9% for ball x. Its meaning and units
 remain uncertain, and the external-match loader does not retain a directly equivalent player-speed
 field. No new signal was added to inference.
+
+**Decision (2026-11-03):** dropped. The IDSSE training data has no equivalent field, so a model could
+learn its meaning only from the challenge match, which the 3 Nov rules forbid. Player speed is
+already derived from positions.
 
 ## Shared follow-ups
 
