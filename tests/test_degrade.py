@@ -47,6 +47,19 @@ class DegradeTests(unittest.TestCase):
         for x, y in zip(a, b):
             np.testing.assert_array_equal(x, y)
 
+    def test_random_ball_is_repeatable_and_spends_the_share_per_half(self):
+        _, ball, _ = match(n=20000)
+        half = np.repeat([1, 2], 10000)
+        ext = {"missing_share": 0.4, "gap_s_quantiles": [1.0, 3.0]}
+        with mock.patch.dict(dg.PARAMS, ext, clear=True):
+            b = dg.random_ball(ball, half, np.random.default_rng(3))
+            again = dg.random_ball(ball, half, np.random.default_rng(3))
+        np.testing.assert_array_equal(b, again)
+        for h in (1, 2):
+            share = np.isnan(b[half == h, 0]).mean()
+            self.assertTrue(0.25 < share <= 0.4, share)
+        self.assertTrue(np.isfinite(b[~np.isnan(b[:, 0])]).all())
+
 
 if __name__ == "__main__":
     unittest.main()

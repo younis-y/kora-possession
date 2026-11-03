@@ -18,12 +18,21 @@ ROOT = Path(__file__).resolve().parent.parent
 
 VARIANTS = {
     "b0": {},                                         # compliant baseline: rebased degradation, v3 features
+    "b0_w4": {"decoder": {"inner_wins": 4}},          # exploratory: HSMM kept on 4 of 6 inner wins (Y5)
     "touch": {"touch": True},                         # R1: touch and handover features
     "touch_bal": {"touch": True, "balance": 0.5},     # R2: R1 + possession-balanced sample weights
+    "mixed": {"mixed": True},                         # J6: odd training copies get label-free ball gaps
+    "b0_rand": {"eval_rand": True},                   # J6 random-gap test: evaluation copies get them too
+    "mixed_rand": {"mixed": True, "eval_rand": True},
 }
 PRODUCTION = "b0"
-FEATURE_KEYS = ("touch",)
+FEATURE_KEYS = ("touch", "mixed", "eval_rand")
 TRAIN_KEYS = ("balance",)
+
+# Decoder selection in kora.nested. A variant overrides any key under "decoder"; nothing here touches the
+# stage-1 caches. Grids are lists of tuples: plain (alpha, cost_ha, cost_d), hsmm (cost_ha, cost_d, w_dur,
+# beta); None means the default grids (kora.train GRID_*, kora.boundary GRID).
+DECODER = {"inner_wins": 5, "plain_grid": None, "hsmm_grid": None}
 
 
 def _name():
@@ -58,3 +67,7 @@ def feature_version(config=CONFIG):
 def stage1_version(config=CONFIG):
     switches = json.dumps({k: config.get(k) for k in TRAIN_KEYS}, sort_keys=True)
     return feature_version(config) + "s" + _hash([(ROOT / "kora" / "train.py").read_bytes(), switches])
+
+
+def decoder(config=CONFIG):
+    return {**DECODER, **config.get("decoder", {})}

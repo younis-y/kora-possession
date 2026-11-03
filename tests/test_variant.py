@@ -14,5 +14,16 @@ class VariantTests(unittest.TestCase):
         self.assertIn(variant.PRODUCTION, variant.VARIANTS)
 
 
+
+class DecoderConfigTests(unittest.TestCase):
+    def test_reference_rule_is_five_of_six_and_variants_override_it(self):
+        self.assertEqual(variant.decoder(variant.VARIANTS["b0"])["inner_wins"], 5)
+        self.assertEqual(variant.decoder(variant.VARIANTS["b0_w4"])["inner_wins"], 4)
+
+    def test_decoder_switches_do_not_touch_stage1_caches(self):
+        self.assertEqual(variant.stage1_version(variant.VARIANTS["b0"]),
+                         variant.stage1_version(variant.VARIANTS["b0_w4"]))
+
+
 if __name__ == "__main__":
     unittest.main()
