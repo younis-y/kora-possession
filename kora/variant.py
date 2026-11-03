@@ -20,9 +20,12 @@ VARIANTS = {
     "b0": {},                                         # compliant baseline: rebased degradation, v3 features
     "touch": {"touch": True},                         # R1: touch and handover features
     "touch_bal": {"touch": True, "balance": 0.5},     # R2: R1 + possession-balanced sample weights
+    "mixed": {"mixed": True},                         # J6: odd training copies get label-free ball gaps
+    "b0_rand": {"eval_rand": True},                   # J6 random-gap test: evaluation copies get them too
+    "mixed_rand": {"mixed": True, "eval_rand": True},
 }
 PRODUCTION = "b0"
-FEATURE_KEYS = ("touch",)
+FEATURE_KEYS = ("touch", "mixed", "eval_rand")
 TRAIN_KEYS = ("balance",)
 
 
