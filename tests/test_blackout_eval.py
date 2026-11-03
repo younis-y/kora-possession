@@ -1,5 +1,6 @@
 import unittest
 import hashlib
+import copy
 import subprocess
 import sys
 from unittest.mock import patch
@@ -8,7 +9,9 @@ import pandas as pd
 
 import numpy as np
 
-from kora.blackout_eval import conditions, training_matches, scores, training_data
+from kora.blackout_eval import (conditions, training_matches, scores, training_data,
+                               nested_plain_settings, verify_reference_arrays)
+from kora.external import MATCHES
 
 
 class BlackoutEvaluationTests(unittest.TestCase):
@@ -82,6 +85,44 @@ class BlackoutEvaluationTests(unittest.TestCase):
             other, _ = training_data('held', 'independent', 18)
         np.testing.assert_array_equal(one, repeat)
         self.assertFalse(np.array_equal(one, other))
+
+    def test_nested_settings_require_plain_decoder_and_exclude_heldout(self):
+        meta = {'schema': 1, 'fps': 25, 'matches': list(MATCHES), 'commit': 'a' * 40,
+                'dirty': False, 'seed': 2027, 'feature_version': 'v3',
+                'train_copies': 2, 'subsample': 6}
+        fold = {'decoder': 'plain', 'inner_matches': list(MATCHES)[1:],
+                'plain': {'alpha': 0.0, 'cost_ha': 16, 'cost_d': 32},
+                'prior': [0.25, 0.25, 0.5]}
+        summary = {**meta, 'folds': {'J03WPY': fold}}
+        prior, setting = nested_plain_settings(summary, meta, 'J03WPY')
+        np.testing.assert_array_equal(prior, [0.25, 0.25, 0.5])
+        self.assertEqual(setting, (0.0, 16, 32))
+        broken = copy.deepcopy(summary)
+        broken['folds']['J03WPY']['decoder'] = 'hsmm'
+        with self.assertRaisesRegex(ValueError, 'plain'):
+            nested_plain_settings(broken, meta, 'J03WPY')
+        broken = copy.deepcopy(summary)
+        broken['folds']['J03WPY']['inner_matches'].append('J03WPY')
+        with self.assertRaisesRegex(ValueError, 'inner'):
+            nested_plain_settings(broken, meta, 'J03WPY')
+        with self.assertRaisesRegex(ValueError, 'metadata'):
+            nested_plain_settings(summary, {**meta, 'seed': 8}, 'J03WPY')
+        with self.assertRaisesRegex(ValueError, 'metadata'):
+            nested_plain_settings({**summary, 'dirty': True}, {**meta, 'dirty': True}, 'J03WPY')
+
+    def test_reference_requires_exact_path_and_alignment(self):
+        reference = {'y_true': np.array([0, 2, 1]), 'y_pred': np.array([0, 2, 1]),
+                     'half': np.array([1, 1, 2]), 'frame': np.arange(3),
+                     'ball_seen': np.array([1, 0, 1])}
+        verify_reference_arrays(reference, reference)
+        for key in reference:
+            altered = {k: v.copy() for k, v in reference.items()}
+            altered[key][0] += 1
+            with self.subTest(key=key), self.assertRaisesRegex(ValueError, key):
+                verify_reference_arrays(reference, altered)
+        altered = {**reference, 'frame': np.arange(2)}
+        with self.assertRaisesRegex(ValueError, 'frame'):
+            verify_reference_arrays(reference, altered)
 
     def test_conditions_are_reproducible_and_do_not_mutate_input(self):
         n = 5000
