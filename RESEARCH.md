@@ -361,12 +361,42 @@ inner-selected settings informed the design. No outer score of a V5 candidate ex
 
 ### [pending] V6: Should transition costs and boundary bonuses depend on direction?
 
-**Hypothesis:** Entering D differs from leaving D. H→A evidence should not reward unrelated
-transitions or every new live segment.
+**Hypothesis:** The decoder uses only the detector's H↔A output. Currently, `decode_hsmm` adds its
+log-ratio bonus at every live segment start, including restarts and same-state continuations. These
+starts are penalised when the detector is below its base rate. Restricting the bonus to H↔A
+transitions may make handovers cheaper where the detector fires without rewarding or penalising
+restarts.
 
-**Experiment:** Separate live→D and D→live costs while retaining H/A symmetry. Then compare
-transition-specific outputs and bonuses for H→A, A→H, live→D, and D→live. Track timing and
-merge/split changes.
+Separate costs for entering and leaving dead ball were dropped. Stoppages and restarts alternate
+within a half. Writing their costs as `m − d` and `m + d` gives a total of
+`m(N_in + N_out) + d(N_out − N_in)`. With `m`, endpoint states, and same-state continuation
+penalties fixed, the directional term is constant, so it cannot change the preferred internal
+boundaries. Otherwise endpoint preferences or continuation penalties can change. The plain decoder
+has the same property.
+
+**Pre-registration, round 1 (2026-11-03, before any outer run of this candidate).**
+
+- Candidate `v6_ha_only` in `kora/variant.py`: B0's 54 HSMM settings in their existing order, each
+  with `ha_bonus_only` set. The bonus then applies only to H→A and A→H transitions. Initial
+  segments, restarts, stoppages, and same-state continuations get no bonus. The plain grid and
+  `inner_wins` 5 are unchanged. Stage-1 caches are reused and detectors are refitted.
+- Default unchanged: with `ha_bonus_only` off, `decode_hsmm` matches the previous implementation
+  exactly in synthetic tests (`tests/test_v6_decoder.py`), and `kora.run` reproduces the committed
+  submission hash.
+- Independent of V5: frozen on B0 before any V5 result exists, and not combined with a V5 winner in
+  this round.
+- Base, run, decision, and pairing check: as in V5 round 1, with `v6_ha_only` in place of
+  `v5_wide`. Keep if the unrounded mean spellF1 difference is positive and at least 5 of 7 matches
+  improve strictly. Ties are not wins. One candidate in this round.
+- Secondary, reported but not deciding: as in V5, plus handover and restart recall and precision at
+  12 and 25 frames from `kora.errors --predictions`, to monitor possible indirect effects on restart
+  predictions.
+- Known limits: the best inner-mean HSMM setting is chosen before the 5-of-6 gate. The beta values
+  were set for a bonus on every live start and may not suit a handover-only bonus. A joint grid is
+  not part of this round.
+- Deployment: `kora.boundary` and `kora.run` keep the default. A kept result needs a separate change
+  before it reaches the submission.
+- Cost: 2,268 inner `decode_hsmm` calls, the same as B0.
 
 **Outcome:** —
 
