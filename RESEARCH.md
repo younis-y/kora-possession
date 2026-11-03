@@ -129,6 +129,16 @@ false predictions.
   many-to-many, weak overlaps, erased opposite possessions, adjacent halves, X handling,
   normalisation, and bundle validation.
 
+**Provisional result on Y1 predictions** (`nested-v1` release, SHA-256 `d54d02b2…`, which reproduces spellF1 0.7169 ± 0.0304). Y1's degradation values were measured on the challenge tracking, which the organisers' 3 Nov rules do not allow for training. These figures are a pipeline check until the B0 bundle is available.
+
+- 3,061 true and 2,445 predicted possessions over the seven matches, 20% too few (206 against
+  165 per 45 minutes).
+- At IoU 0.5, 2,000 are matched, 1,061 true spells are missed, and 445 predicted spells are
+  unmatched.
+- Under the declared association rule, 226 merge components cover 481 true spells, all with
+  opposite-team gaps, versus 42 split components, all with wrong-team gaps. No split component
+  has a false D gap. Another 534 true spells have no retained same-team overlap.
+
 ### [pending] V2: Are short possessions missing or mistimed?
 
 **Hypothesis:** IoU 0.5 alone hides the difference between missed possessions and inaccurate boundaries.
@@ -146,6 +156,15 @@ one second on clean predictions.
 - Checks: group edges, cross-group pairs, empty groups, totals against the official scorer,
   and extra fragments lowering precision without changing recall.
 - The one-fifth recall below one second still needs clean predictions.
+
+**Provisional result on Y1 predictions** (`nested-v1` release, SHA-256 `d54d02b2…`, which reproduces spellF1 0.7169 ± 0.0304). Y1's degradation values were measured on the challenge tracking, which the organisers' 3 Nov rules do not allow for training. These figures are a pipeline check until the B0 bundle is available.
+
+- Recall at IoU 0.5 by true duration: `<1` s 0.180 (384 spells), `1–2` s 0.445 (535), `2–4` s
+  0.623 (702), `4–8` s 0.785 (620), `8–15` s 0.900 (438), `15+` s 0.982 (382). The one-fifth
+  recall below one second holds on these predictions.
+- Precision at IoU 0.5 by predicted duration: `<1` s 0.638 (130 spells), `1–2` s 0.645 (330),
+  `15+` s 0.959 (413). Short possessions are mostly missed rather than invented: 130 predicted
+  below one second against 384 true.
 
 ### [pending] V3: Which transition types fail, and by how much?
 
@@ -171,6 +190,22 @@ their share of all wrong frames, and overlapping windows.
 - Checks: timing offsets at both tolerances, type confusion, transitions across adjacent
   halves, both ambiguity cases, window overlap and clipping, and pooled quantiles.
 
+**Provisional result on Y1 predictions** (`nested-v1` release, SHA-256 `d54d02b2…`, which reproduces spellF1 0.7169 ± 0.0304). Y1's degradation values were measured on the challenge tracking, which the organisers' 3 Nov rules do not allow for training. These figures are a pipeline check until the B0 bundle is available.
+
+- At 25 frames: H↔A recall 0.531 and precision 0.720 (2,351 true, 1,734 predicted). H/A→D 0.669
+  and 0.669 (710 and 710). D→H/A 0.966 and 0.967 (699 and 698).
+- Among handovers matched within 25 frames, median absolute error is 2 frames, p90 is 15 frames,
+  and mean signed error is −0.4 frames. These statistics describe only matched events.
+- Of 235 stoppages missed under exact pairs at tolerance 25 frames, 216 have a predicted
+  stoppage within 1 s whose preceding team is wrong. This identifies a preceding-team mismatch
+  near the stoppage. The V7 audit separately found 36 of 41 affected handover targets just
+  before stoppages. The relationship between these findings remains untested.
+- Wrong frames: 58% lie within 1 s of a handover, 14% within 1 s of a stoppage, and 2% within
+  1 s of a restart (inclusive rows). 68% lie in any window, which reproduces the earlier figure.
+  32% lie outside all windows.
+- Restart timing (p90 1 frame) may be flattered by the simulated blackouts, which are placed
+  mostly in dead ball.
+
 ### [pending] V4: How often is D predicted during live play?
 
 **Hypothesis:** The reported 2% of errors on true dead ball excludes false D during possession.
@@ -187,6 +222,14 @@ Measure the reverse error: H/A predicted on true D. Include numerators and denom
   simulated blackout, not challenge tracking.
 - Checks: hand-computed rows, X on live frames, zero denominators, and agreement with
   `pm.confusion`.
+
+**Provisional result on Y1 predictions** (`nested-v1` release, SHA-256 `d54d02b2…`, which reproduces spellF1 0.7169 ± 0.0304). Y1's degradation values were measured on the challenge tracking, which the organisers' 3 Nov rules do not allow for training. These figures are a pipeline check until the B0 bundle is available.
+
+- False D during live play: 2,481 of 553,105 true live frames (0.4%). Ball seen: 559 of 530,418
+  (0.1%). Ball missing: 1,922 of 22,687 (8.5%).
+- H/A predicted on true D: 1,043 of 449,539 frames (0.2%).
+- Visibility here is simulated blackout, so these rates may not transfer to the challenge
+  tracking.
 
 ### [pending] V5: Which decoder weights improve possession recovery?
 
