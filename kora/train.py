@@ -3,8 +3,8 @@ leave-one-match-out cross-validation, scored with the challenge's own spellF1 co
 
     python -m kora.train            # writes models/classifier.joblib and models/decoder.json
 
-No data about the challenge match is labelled or scored here. The degradation ranges were set from
-unlabelled statistics of the challenge tracking (see kora/degrade.py).
+No data about the challenge match is labelled, scored or measured here. The degradation takes every
+number from external data (kora/missingness.py -> models/degrade_external.json).
 """
 import itertools
 import json
@@ -22,6 +22,7 @@ from .decode import decode
 from .degrade import degrade
 from .external import MATCHES, load
 from .features import build, mirror
+from .variant import CONFIG, feature_version, stage1_version
 from .vendor import possession_metrics as pm
 
 warnings.filterwarnings("ignore", category=RuntimeWarning)
@@ -49,7 +50,8 @@ def segments_of(half):
     return list(zip(starts.tolist(), stops.tolist()))
 
 
-FEATURE_VERSION = "v3"
+FEATURE_VERSION = feature_version()      # hash of features/degradation code + external params
+STAGE1_VERSION = stage1_version()        # + training code and switches
 
 
 def copies(match):
@@ -88,6 +90,31 @@ def stack(train_sets):
     return X, y
 
 
+def balance_weights(label, lam):
+    """Per-frame weight (1 - lam) + lam * mean_len / len(own possession), normalised to mean 1.
+
+    spellF1 counts every possession once, however long; lam > 0 moves the training loss toward that.
+    Dead-ball frames keep weight 1 before normalisation."""
+    edges = np.flatnonzero(np.diff(label) != 0) + 1
+    starts, stops = np.r_[0, edges], np.r_[edges, len(label)]
+    lengths = np.repeat(stops - starts, stops - starts).astype(np.float64)
+    live = label < 2
+    w = np.ones(len(label))
+    if live.any():
+        w[live] = (1 - lam) + lam * lengths[live].mean() / lengths[live]
+    return w / w.mean()
+
+
+def fit_classifier(train_sets):
+    """Stage-1 classifier on stacked training copies, with balanced weights when the variant asks."""
+    X, y = stack(train_sets)
+    lam = CONFIG.get("balance")
+    if not lam:
+        return classifier().fit(X, y)
+    w = np.concatenate([balance_weights(lab, lam)[::SUBSAMPLE] for _, lab in train_sets])
+    return classifier().fit(X, y, sample_weight=w)
+
+
 def spell_f1(label, pred, half):
     """Official spellF1 with an X frame inserted between the halves, so they are scored apart."""
     cut = np.flatnonzero(np.diff(half) != 0) + 1
@@ -110,13 +137,12 @@ def main():
     oof = {}
     for m in MATCHES:
         Xe, ye, he = data[m][1]
-        fold_cache = cache_dir() / f"oof_{FEATURE_VERSION}_{m}.npy"     # resumable: finished folds are kept
+        fold_cache = cache_dir() / f"oof_{STAGE1_VERSION}_{m}.npy"      # resumable: finished folds are kept
         if fold_cache.exists():
             oof[m] = np.load(fold_cache)
             print(f"fold {m}: cached", flush=True)
             continue
-        X, y = stack([s for k in MATCHES if k != m for s in data[k][0]])
-        clf = classifier().fit(X, y)
+        clf = fit_classifier([s for k in MATCHES if k != m for s in data[k][0]])
         oof[m] = clf.predict_proba(Xe.to_numpy())
         np.save(fold_cache, oof[m])
         acc = (oof[m].argmax(1) == ye).mean()
@@ -147,12 +173,13 @@ def main():
     best = results[0]
 
     # final classifier on all seven matches
-    clf = classifier().fit(X, y)
+    clf = fit_classifier([s for k in MATCHES for s in data[k][0]])
     MODELS.mkdir(exist_ok=True)
     joblib.dump({"model": clf, "columns": columns}, MODELS / "classifier.joblib", compress=3)
     cfg = {"alpha": best[3], "cost_ha": best[4], "cost_d": best[5], "prior": prior.tolist(),
            "cv_spell_f1_mean": best[0], "cv_spell_f1_std": best[1], "cv_spell_f1_per_match": dict(zip(MATCHES, best[6])),
-           "cv_macro_f1_mean": best[2], "train_copies": TRAIN_COPIES, "subsample": SUBSAMPLE, "seed": SEED}
+           "cv_macro_f1_mean": best[2], "train_copies": TRAIN_COPIES, "subsample": SUBSAMPLE, "seed": SEED,
+           "feature_version": FEATURE_VERSION, "stage1_version": STAGE1_VERSION}
     (MODELS / "decoder.json").write_text(json.dumps(cfg, indent=2))
     np.savez_compressed(MODELS / "oof.npz", **{m: oof[m] for m in MATCHES})
     print(f"\nsaved models/ ({time.time() - t0:.0f} s)")

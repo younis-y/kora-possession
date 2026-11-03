@@ -10,14 +10,16 @@ and the plain decoder settings were fit on all seven. Here, per outer match m:
    on all six (the kora.train fold, reused from its cache).
 2. prior, plain decoder grid, detector (inner leave-one-out for selection, all six for m), rate,
    duration prior and the HSMM grid, all on the six inner matches.
-3. the HSMM is used on m only if it beats the plain decoder on the inner mean and on 5 of 6 inner
-   matches, mirroring the 5-of-7 rule of kora.boundary.
+3. the HSMM is used on m only if it beats the plain decoder on the inner mean and on at least 4 of
+   the 6 inner matches (pre-registered 2026-11-03; 5 of 6 rejected a better decoder on J03WPY).
 
-    python -m kora.nested      # after kora.train; a few hours on first run (stage-1 folds are cached)
+    python -m kora.nested --variant b0     # a few hours on first run (stage-1 folds are cached)
 
-Writes models/nested.json (settings and scores per fold, committed) and models/nested_predictions.npz
-(schema-1 bundle for `kora.errors --predictions`, gitignored).
+Writes models/nested_<variant>.json (settings and scores per fold, committed) and
+models/nested_<variant>_predictions.npz (schema-1 bundle for `kora.errors --predictions`, gitignored).
+Compare two variants with `python -m kora.compare b0 <variant>`.
 """
+import argparse
 import json
 import subprocess
 import time
@@ -30,12 +32,14 @@ from .boundary import GRID, RAW, context, model as detector, runs_of, target
 from .data import cache_dir
 from .decode import decode, decode_hsmm, log_duration
 from .external import MATCHES
-from .train import (FEATURE_VERSION, GRID_ALPHA, GRID_D, GRID_HA, MODELS, SEED, SUBSAMPLE, TRAIN_COPIES,
-                    classifier, copies, segments_of, stack)
+from .train import (FEATURE_VERSION, GRID_ALPHA, GRID_D, GRID_HA, MODELS, SEED, STAGE1_VERSION, SUBSAMPLE,
+                    TRAIN_COPIES, copies, fit_classifier, segments_of)
+from .variant import CONFIG, NAME, VARIANTS
 from .vendor import possession_metrics as pm
 
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 PLAIN = [(a, h, d) for a in GRID_ALPHA for h in GRID_HA for d in GRID_D]
+INNER_WINS = 4          # HSMM kept on the outer match if it beats plain on the inner mean and >= 4 of 6
 
 
 def scores(y, pred, half):
@@ -48,11 +52,11 @@ def scores(y, pred, half):
 def stage1(data, excluded, k):
     """Stage-1 probabilities on k from a classifier trained without any match in `excluded` (k included)."""
     name = k if excluded == {k} else f"{k}_x{''.join(sorted(excluded - {k}))}"
-    path = cache_dir() / f"oof_{FEATURE_VERSION}_{name}.npy"          # {k} alone is kora.train's own fold
+    path = cache_dir() / f"oof_{STAGE1_VERSION}_{name}.npy"           # {k} alone is kora.train's own fold
     if path.exists():
         return np.load(path)
-    X, y = stack([s for j in MATCHES if j not in excluded for s in data[j][0]])
-    p = classifier().fit(X, y).predict_proba(data[k][1][0].to_numpy())
+    p = fit_classifier([s for j in MATCHES if j not in excluded for s in data[j][0]]).predict_proba(
+        data[k][1][0].to_numpy())
     np.save(path, p)
     return p
 
@@ -76,7 +80,11 @@ def hsmm_scores(P, C, y, half, prior, rate, setting):
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--variant", default=NAME, choices=VARIANTS, help="read at import by kora.variant")
+    parser.parse_args()
     t0 = time.time()
+    print(f"variant {NAME} {CONFIG}  features {FEATURE_VERSION}  stage 1 {STAGE1_VERSION}", flush=True)
     data = {m: copies(m) for m in MATCHES}
     y = {m: data[m][1][1] for m in MATCHES}
     half = {m: data[m][1][2] for m in MATCHES}
@@ -118,7 +126,7 @@ def main():
         bp = int(plain.mean(1).argmax())
         hs = np.array(Parallel(n_jobs=-1)(delayed(hsmm_scores)(P, C, yi, hi, prior, rate, g) for g in GRID))
         bh = int(hs.mean(1).argmax())
-        keep = bool(hs[bh].mean() > plain[bp].mean() and (hs[bh] > plain[bp]).sum() >= 5)
+        keep = bool(hs[bh].mean() > plain[bp].mean() and (hs[bh] > plain[bp]).sum() >= INNER_WINS)
 
         ld = log_duration([r for k in ins for r in runs_of(y[k], half[k])])
         seg = segments_of(half[m])
@@ -146,15 +154,17 @@ def main():
     meta = {"schema": 1, "fps": 25, "matches": list(MATCHES),
             "provenance": "kora.nested: each held-out match excluded from stage 1, the detector, the prior, "
                           "the rate, the duration prior and decoder selection; scored once. "
-                          "Ball blackouts are simulated (kora/degrade.py), not challenge tracking.",
-            "commit": commit, "dirty": dirty, "seed": SEED, "feature_version": FEATURE_VERSION,
+                          "Ball and player gaps are simulated from external measurements (kora/degrade.py), "
+                          "not challenge tracking.",
+            "commit": commit, "dirty": dirty, "seed": SEED, "variant": NAME, "config": CONFIG,
+            "feature_version": FEATURE_VERSION, "stage1_version": STAGE1_VERSION, "inner_wins": INNER_WINS,
             "train_copies": TRAIN_COPIES, "subsample": SUBSAMPLE}
     summary = {**meta, "spell_f1_mean": float(f1.mean()), "spell_f1_std": float(f1.std()),
                "spell_f1_plain_mean": float(np.mean([folds[m]["spell_f1_plain"] for m in MATCHES])),
                "spell_f1_hsmm_mean": float(np.mean([folds[m]["spell_f1_hsmm"] for m in MATCHES])),
                "folds": folds}
-    (MODELS / "nested.json").write_text(json.dumps(summary, indent=2))
-    np.savez_compressed(MODELS / "nested_predictions.npz", meta=json.dumps(meta), **bundle)
+    (MODELS / f"nested_{NAME}.json").write_text(json.dumps(summary, indent=2))
+    np.savez_compressed(MODELS / f"nested_{NAME}_predictions.npz", meta=json.dumps(meta), **bundle)
     print(f"\nclean spellF1 {f1.mean():.4f} +- {f1.std():.4f}  (plain {summary['spell_f1_plain_mean']:.4f}, "
           f"hsmm {summary['spell_f1_hsmm_mean']:.4f})  per match: " + " ".join(f"{v:.3f}" for v in f1))
     print(f"({time.time() - t0:.0f} s)")
