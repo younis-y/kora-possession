@@ -300,9 +300,12 @@ One provisional J03WPY retraining run used independent ball gaps during training
 independent-gap scores were 0.6809 / 0.6516 / 0.6645, versus 0.6472 / 0.6249 / 0.6302 for the
 current training simulation. Its current-gap scores were 0.6909 / 0.6618 / 0.6951, versus 0.7085 /
 0.6784 / 0.7021. This is one match, one training seed, and a fixed historical decoder; it is not a
-merge decision. Seven-match clean nested comparisons and player-loss sensitivity remain pending. Y1 artifacts need the
-held-out predictions, matching visibility masks, run metadata, and confirmation that decoder settings
-were selected without the held-out match.
+merge decision. Seven-match clean nested comparisons and player-loss sensitivity remain pending.
+Y1 now supplies held-out predictions, matching visibility and provenance; its decoder settings
+exclude the outer match. Source inspection found an inner-selection dependency: for outer match m
+and inner validation match k, detector-training features for another match j can come from a
+stage-1 model trained on k. Inner prior and boundary rate also include k. This may bias inner
+selection scores, but does not by itself put outer match m into training. Its effect is unmeasured.
 
 ### [pending] J2: Can player movement identify possession during ball gaps?
 
