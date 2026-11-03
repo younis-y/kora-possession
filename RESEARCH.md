@@ -252,7 +252,7 @@ at all five IoUs.
 
 ## José — missing-ball robustness and extra data
 
-### [pending] J1: Does the score depend on one blackout simulation?
+### [verified] J1: Does the score depend on one blackout simulation?
 
 **Hypothesis:** Label-conditioned gaps may reward an unrealistic association between missing ball
 and dead ball.
@@ -328,9 +328,23 @@ condition alone. This uses the pre-Y5 degradation; a pass makes `mixed` a candid
 against B0, not a merge. `--duration-matched` now reads `models/degrade_external.json`, never
 the challenge match.
 
-**Outcome:** —
+**Outcome (2026-11-03, commit e0c22fd):** mixed passes the pre-registered rule: primary score
+**0.6480 vs 0.6337 (+0.0144), better on 7 of 7 matches** (+0.006 to +0.028). It costs a little
+on the current simulation alone: 0.6993 vs 0.7031 (−0.004, 4 of 7).
 
-### [pending] J2: Can player movement identify possession during ball gaps?
+| condition (mean of 7 matches × 3 seeds) | current training | mixed training |
+| --- | ---: | ---: |
+| current | 0.7031 | 0.6993 |
+| independent | 0.6352 | 0.6589 |
+| live | 0.6534 | 0.6679 |
+| shuffled_current | 0.5430 | 0.5661 |
+
+The plain decoder is fixed and its settings were chosen on all seven matches in the old pipeline,
+so these are paired comparisons, not nested scores. Degradation is pre-Y5. Next: register `mixed`
+as a variant on B0 (label-independent gaps on odd training copies) and score it with
+`kora.nested` + `kora.compare` after R0. Logs: `data/j1-mixed/` (local).
+
+### [dropped] J2: Can player movement identify possession during ball gaps?
 
 **Hypothesis:** Player geometry and movement can provide evidence without reconstructing ball coordinates.
 
@@ -348,6 +362,11 @@ different frames; player-only predictions do not change when only the ball mask 
 decoded spellF1, and clean nested comparison remain pending. The saved run manifest
 records a blackout evaluator hash different from this branch; the earlier source snapshot was not
 saved. Exact rerun reproducibility of these results has not been established.
+
+**Decision (2026-11-03):** dropped. On the same 69,479 live gap frames (current simulation, seven
+matches, seeds 11/22/33), the main classifier gets 59,625 right (85.8%) and the player-only model
+58,612 (84.4%); with mixed training the main model gets 86.2%. The main model already uses the
+player signal, so a fusion has little to add. Fusion itself was not tested.
 
 ### [verified] J3: Does the domain comparison survive time- and match-separated splits?
 
