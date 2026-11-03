@@ -253,7 +253,14 @@ Each entry is spellF1 for seeds 11 / 22 / 33. Player dropout is shared across th
 is label-conditioned. Independent and current conditions change both gap placement and rate. On
 J03WMX, a separate rearrangement preserved the number and lengths of ball gaps within each half:
 current 0.6520 / 0.6727 / 0.6635 versus rearranged 0.5289 / 0.5368 / 0.4925. The rearrangement
-changes alignment with player dropouts and retains label-conditioned gap lengths.
+changes alignment with player dropouts and retains label-conditioned gap lengths. Separate random
+generators for gap masks and degradation use the same seed; statistical independence between
+their streams has not been established. On the unlabelled challenge tracking, the two
+scored halves contain 150 missing-ball stretches, with a pooled median of 10.72 s and p90 of
+33.81 s. The independent-gap simulation has a median of 1.32–1.44 s across the seven matches and
+three seeds. The observed target duration distribution does not reveal whether each gap is live
+or dead and is not labelled validation. Test a label-independent duration-matched scenario before
+drawing conclusions from the independent-gap experiment.
 
 One provisional J03WPY retraining run used independent ball gaps during training. Its
 independent-gap scores were 0.6809 / 0.6516 / 0.6645, versus 0.6472 / 0.6249 / 0.6302 for the
@@ -278,7 +285,9 @@ current-simulation live frames inside gaps, it got 58,612 / 69,479 frames correc
 always-home baseline got 37,023 / 69,479 (53.3%). Counts repeat frames across seeds and are not
 independent samples. Both figures condition on the true frame being live. Gap scenarios select
 different frames; player-only predictions do not change when only the ball mask changes. Fusion,
-decoded spellF1, and clean nested comparison remain pending.
+decoded spellF1, and clean nested comparison remain pending. The saved run manifest
+records a blackout evaluator hash different from this branch; the earlier source snapshot was not
+saved. Exact rerun reproducibility of these results has not been established.
 
 ### [pending] J3: Does the domain comparison survive time- and match-separated splits?
 
@@ -325,12 +334,32 @@ A comparison with fixed German-only validation or fixed iterations and the Y1 ev
 needed. No Metrica-trained model has been released.
 
 A follow-up used a fixed whole German match (J03WR9) for both models' early-stopping
-validation, five other German matches for fitting, and J03WPY as the untouched outer test.
+validation, five other German matches for fitting, and J03WPY as the outer test. J03WPY was
+excluded from fitting and early stopping, but has been examined in earlier experiments; repeated
+research decisions can overfit it.
 The Metrica anchors were used only in fitting. On the same seed-11 current simulated gaps,
 Sportec-only was 2,812 / 3,313 correct (84.88%); Sportec plus Metrica was 2,792 / 3,313
 (84.27%). The fits stopped at 128 and 107 iterations, respectively. This removes the differing
 validation-set confound in the earlier comparison but remains a single match and seed, with no
 fusion or spellF1 result. No change is selected; the full Y1 comparison remains necessary.
+
+Research tools on this branch need the pinned Game 3 files in the ignored data directory:
+
+```bash
+revision=e706dd506b360d69d9d123d5b8026e7294b13996
+base="https://raw.githubusercontent.com/metrica-sports/sample-data/$revision/data/Sample_Game_3"
+mkdir -p "data/external/metrica/$revision"
+for file in Sample_Game_3_events.json Sample_Game_3_metadata.xml Sample_Game_3_tracking.txt; do
+  curl -fL "$base/$file" -o "data/external/metrica/$revision/$file"
+done
+.venv/bin/python -m kora.metrica_anchors
+.venv/bin/python -m kora.metrica_tracking
+OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 .venv/bin/python -m kora.metrica_eval
+```
+
+The audit and comparison verify pinned file hashes. The comparison also requires the seven
+German matches cached by `python -m kora.external`. These commands are research only, not the
+submission build or the clean nested evaluation. Metrica reuse terms remain unresolved.
 
 ### [pending] J5: Are useful tracking measurements discarded?
 
