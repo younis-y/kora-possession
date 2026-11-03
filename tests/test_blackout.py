@@ -2,10 +2,44 @@ import unittest
 
 import numpy as np
 
-from kora.blackout import apply_mask, make_mask, summarize, shuffle_gaps
+from kora.blackout import apply_mask, make_mask, summarize, shuffle_gaps, gap_profile, duration_matched_mask
 
 
 class BlackoutTests(unittest.TestCase):
+    def test_gap_profile_uses_only_selected_blocks_and_splits_at_boundaries(self):
+        ball = np.ones((12, 2))
+        ball[[0, 2, 3, 5, 6, 7, 11], :] = np.nan
+        lengths, share = gap_profile(ball, [(1, 6), (6, 10)])
+        np.testing.assert_array_equal(lengths, [2, 1, 2])
+        self.assertAlmostEqual(share, 5 / 9)
+
+    def test_duration_matched_masks_are_repeatable_and_preserve_existing_gaps(self):
+        half = np.repeat([1, 2], 40000)
+        existing = np.zeros(len(half), bool)
+        existing[10:12] = True
+        mask = duration_matched_mask(half, [8, 12], 0.4, 11, existing)
+        np.testing.assert_array_equal(mask, duration_matched_mask(half, [8, 12], 0.4, 11, existing))
+        self.assertFalse(np.array_equal(mask, duration_matched_mask(half, [8, 12], 0.4, 12, existing)))
+        self.assertTrue(mask[10:12].all())
+        self.assertFalse(existing[12:].any())
+        self.assertAlmostEqual(mask.mean(), 0.4, delta=2 / len(mask))
+        self.assertGreaterEqual(mask[:40000].sum(), 16000)
+        self.assertLessEqual(mask[:40000].sum(), 16002)
+        self.assertEqual(mask[40000:].sum(), 16000)
+        for h in (1, 2):
+            gaps = summarize(mask[half == h], np.zeros((half == h).sum()), half[half == h])['gap_frames']
+            self.assertIn(np.median(gaps), (8, 10, 12))
+
+    def test_duration_mask_rejects_infeasible_gap_separation(self):
+        with self.assertRaisesRegex(ValueError, 'separate'):
+            duration_matched_mask(np.ones(100), [1], 0.9, 11)
+
+    def test_duration_profile_rejects_invalid_inputs(self):
+        half = np.ones(20)
+        for lengths, share in (([], 0.4), ([0, 2], 0.4), ([1.5], 0.4), ([1], 0), ([1], 1)):
+            with self.subTest(lengths=lengths, share=share), self.assertRaises(ValueError):
+                duration_matched_mask(half, lengths, share, 1)
+
     def test_independent_masks_ignore_labels_and_repeat_for_seed(self):
         labels = np.tile([0, 1, 2, 2], 1000)
         half = np.repeat([1, 2], 2000)

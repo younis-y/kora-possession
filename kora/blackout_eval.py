@@ -2,6 +2,7 @@
 
     OMP_NUM_THREADS=1 python -m kora.blackout_eval --held-out J03WPY --seeds 11 22 33
     OMP_NUM_THREADS=1 python -m kora.blackout_eval --held-out J03WPY --training-condition independent
+    OMP_NUM_THREADS=1 python -m kora.blackout_eval --held-out J03WPY --duration-matched
 
 The classifier is trained on six other matches with the existing degradation and
 mirroring. The plain decoder uses fixed historical costs (H/A 8, D 32, alpha 0),
@@ -13,6 +14,9 @@ feature cache, submission or challenge data is written. Loading a missing source
 match can download and cache its tracking data.
 
 Independent training changes the ball mask but keeps label-conditioned player degradation.
+The optional duration-matched scenario samples unlabeled challenge gap lengths and the pooled
+missing rate. Its placements ignore labels. The last sampled gap can be shortened; retained
+source gaps may increase the realized missing rate or join gaps.
 """
 import argparse
 import time
@@ -20,7 +24,7 @@ import warnings
 
 import numpy as np
 
-from .blackout import apply_mask, make_mask, shuffle_gaps, summarize
+from .blackout import apply_mask, duration_matched_mask, gap_profile, make_mask, shuffle_gaps, summarize
 from .decode import decode
 from .degrade import degrade
 from .external import MATCHES, load
@@ -30,6 +34,12 @@ from .vendor import possession_metrics as pm
 
 warnings.filterwarnings('ignore', category=RuntimeWarning)
 
+CONDITION_NAMES = ('clean', 'clean_ball', 'current', 'independent', 'live', 'live_crossing',
+                   'clean_players_current', 'clean_players_independent', 'shuffled_current',
+                   'clean_players_shuffled_current', 'duration_matched',
+                   'clean_players_duration_matched')
+DURATION_CONDITIONS = ('duration_matched', 'clean_players_duration_matched')
+
 
 def training_matches(held_out, matches):
     if held_out not in matches:
@@ -37,7 +47,7 @@ def training_matches(held_out, matches):
     return [match for match in matches if match != held_out]
 
 
-def conditions(data, seed):
+def conditions(data, seed, duration_profile=None):
     labels, half, ball = data['label'], data['half'], data['ball']
     if not np.isfinite(ball[:, :2]).all():
         raise ValueError('shuffled gap control requires complete ball tracking')
@@ -48,7 +58,7 @@ def conditions(data, seed):
     live = make_mask(labels, half, 'live', seed, baseline)
     crossing = make_mask(labels, half, 'live_crossing', seed, baseline)
     shuffled_ball = apply_mask(ball[:, :2], shuffle_gaps(baseline, half, seed))
-    return {'clean': (data['players'], ball[:, :2].copy()),
+    result = {'clean': (data['players'], ball[:, :2].copy()),
             'clean_ball': (players, ball[:, :2].copy()),
             'current': (players, current_ball),
             'independent': (players, apply_mask(ball[:, :2], independent)),
@@ -58,6 +68,13 @@ def conditions(data, seed):
             'clean_players_independent': (data['players'], apply_mask(ball[:, :2], independent)),
             'shuffled_current': (players, shuffled_ball),
             'clean_players_shuffled_current': (data['players'], shuffled_ball)}
+    if duration_profile is not None:
+        lengths, share = duration_profile
+        mask = duration_matched_mask(half, lengths, share, seed, original)
+        duration_ball = apply_mask(ball[:, :2], mask)
+        result['duration_matched'] = (players, duration_ball)
+        result['clean_players_duration_matched'] = (data['players'], duration_ball)
+    return result
 
 
 def scores(y, pred, half):
@@ -103,8 +120,22 @@ def main():
     parser.add_argument('--seeds', nargs='+', type=int, default=[11, 22, 33])
     parser.add_argument('--training-condition', choices=('current', 'independent'), default='current')
     parser.add_argument('--training-seed', type=int, default=SEED)
+    parser.add_argument('--duration-matched', action='store_true',
+                        help='sample durations and missing rate from unlabeled challenge tracking')
+    parser.add_argument('--conditions', nargs='+', choices=CONDITION_NAMES,
+                        help='evaluate only the named conditions')
     args = parser.parse_args()
+    if args.conditions and any(c in DURATION_CONDITIONS for c in args.conditions) and not args.duration_matched:
+        parser.error('duration-matched condition requires --duration-matched')
     start = time.monotonic()
+    profile = None
+    if args.duration_matched:
+        from .target import load_target
+        _, _, target_ball, _, graded = load_target()
+        profile = gap_profile(target_ball, graded)
+        lengths, share = profile
+        print(f'unlabeled target gap profile: {len(lengths)} gaps; missing share {share:.4f}; '
+              f'median {np.median(lengths) / 25:.2f}s; p90 {np.percentile(lengths, 90) / 25:.2f}s', flush=True)
     print(f'training condition: {args.training_condition}; training seed: {args.training_seed}', flush=True)
     X, y = training_data(args.held_out, args.training_condition, args.training_seed)
     prior = np.bincount(y, minlength=3) / len(y)
@@ -116,7 +147,9 @@ def main():
     print('PROVISIONAL fixed plain decoder alpha=0 cost_ha=8 cost_d=32; historical selection used all matches')
     print('match seed condition spell_f1 macro_f1 accuracy live_missing/total dead_missing/total gap_median_s gap_p90_s f1_at_0.3_0.4_0.5_0.6_0.7')
     for seed in args.seeds:
-        for name, (players, ball) in conditions(data, seed).items():
+        for name, (players, ball) in conditions(data, seed, profile).items():
+            if args.conditions and name not in args.conditions:
+                continue
             X = build(players, data['team'], ball, half)
             proba = model.predict_proba(X.to_numpy())
             pred = decode(proba, segments_of(half), prior, 0., 8., 32.)

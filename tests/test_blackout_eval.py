@@ -1,4 +1,7 @@
 import unittest
+import hashlib
+import subprocess
+import sys
 from unittest.mock import patch
 
 import pandas as pd
@@ -9,6 +12,16 @@ from kora.blackout_eval import conditions, training_matches, scores, training_da
 
 
 class BlackoutEvaluationTests(unittest.TestCase):
+    def test_cli_rejects_unknown_or_unenabled_duration_condition(self):
+        for arguments, message in ((['--conditions', 'unknown'], 'invalid choice'),
+                                   (['--conditions', 'duration_matched'], 'requires --duration-matched')):
+            result = subprocess.run([sys.executable, '-m', 'kora.blackout_eval',
+                                     '--held-out', 'J03WPY', *arguments],
+                                    capture_output=True, text=True, check=False)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertNotIn('training condition:', result.stdout)
+            self.assertIn(message, result.stderr)
+
     def test_training_partition_excludes_held_out_match(self):
         self.assertEqual(training_matches('b', ['a', 'b', 'c']), ['a', 'c'])
         with self.assertRaises(ValueError):
@@ -98,6 +111,26 @@ class BlackoutEvaluationTests(unittest.TestCase):
         self.assertFalse(np.isnan(first['clean'][0]).any())
         self.assertFalse(np.isnan(data['players']).any())
         self.assertFalse(np.isnan(data['ball']).any())
+
+    def test_duration_scenario_is_optional_and_preserves_existing_masks(self):
+        n = 5000
+        data = {'players': np.ones((n, 4, 2)), 'ball': np.ones((n, 3)),
+                'label': np.tile([0, 1, 2, 2], n // 4), 'half': np.repeat([1, 2], n // 2)}
+        old = conditions(data, 13)
+        extended = conditions(data, 13, ([250, 500], 0.4))
+        for name in old:
+            np.testing.assert_array_equal(old[name][1], extended[name][1])
+        for name, digest in {
+            'current': '3fa3aed3e59bc91f04ea57677add0f2db5c6a1fc4df5f6fc1bb672e3e30f47a8',
+            'independent': 'cf3e3b4fb7ec12a879ce32b927ddaff437755e756b3252c9ec2409873383c37a',
+            'live': 'd8f792230fddd884a7c43014ade19c1290d13f6643a406d0553837f593f22ee1',
+            'live_crossing': '8d175313f821dbf96729d902700e7d982272c61ab9ed7a3d81568dbd4543be13',
+            'shuffled_current': '71a5ac6d2c1f90037a301240cd0a4567f5275b2e55ac4c54d86ebb94068c47f0',
+        }.items():
+            self.assertEqual(hashlib.sha256(np.isfinite(extended[name][1]).tobytes()).hexdigest(), digest)
+        self.assertIs(extended['duration_matched'][0], extended['current'][0])
+        self.assertIs(extended['clean_players_duration_matched'][0], data['players'])
+        np.testing.assert_array_equal(extended['duration_matched'][1], extended['clean_players_duration_matched'][1])
 
     def test_matched_control_rejects_ball_with_preexisting_gaps(self):
         n = 200

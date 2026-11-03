@@ -28,6 +28,64 @@ def _random_gaps(n, share, rng):
     return missing
 
 
+def gap_profile(ball, blocks):
+    """Pool gap lengths and missing share from selected, separate tracking blocks."""
+    ball = np.asarray(ball)
+    if ball.ndim != 2 or ball.shape[1] < 2:
+        raise ValueError('ball must have at least two coordinates')
+    lengths, missing, total = [], 0, 0
+    last = 0
+    for start, end in blocks:
+        if not (0 <= start < end <= len(ball)) or start < last:
+            raise ValueError('blocks must be ordered, non-overlapping and in range')
+        mask = ~np.isfinite(ball[start:end, :2]).all(axis=1)
+        lengths.extend(b - a for a, b in stretches(mask))
+        missing += int(mask.sum())
+        total += end - start
+        last = end
+    if not total or not 0 < missing < total:
+        raise ValueError('selected blocks require both visible and missing ball frames')
+    return np.asarray(lengths, dtype=np.int64), missing / total
+
+
+def duration_matched_mask(half, lengths, share, seed, baseline=None):
+    """Sample gap lengths without labels; round the share per half and retain baseline gaps.
+
+    The last sampled gap may be shortened to meet the missing-frame budget. Baseline gaps
+    can increase the realized share or join simulated gaps.
+    """
+    half, lengths = np.asarray(half), np.asarray(lengths)
+    if half.ndim != 1 or lengths.ndim != 1 or not len(lengths) or not np.issubdtype(lengths.dtype, np.integer) or (lengths <= 0).any():
+        raise ValueError('half must be a vector and lengths must be positive integer frames')
+    if not np.isfinite(share) or not 0 < share < 1:
+        raise ValueError('missing share must be between zero and one')
+    if baseline is not None and np.asarray(baseline).shape != half.shape:
+        raise ValueError('baseline mask must match half')
+    rng = np.random.default_rng([seed, 422027])
+    mask = np.zeros(len(half), dtype=bool)
+    edges = np.r_[0, np.flatnonzero(half[1:] != half[:-1]) + 1, len(half)]
+    for start, end in zip(edges[:-1], edges[1:]):
+        missing = int(round((end - start) * share))
+        visible = end - start - missing
+        remaining, gaps = missing, []
+        while remaining and len(gaps) <= visible:
+            length = min(int(rng.choice(lengths)), remaining)
+            gaps.append(length)
+            remaining -= length
+        if remaining:
+            raise ValueError('not enough visible frames to separate sampled gaps')
+        if not gaps:
+            continue
+        minimum = np.r_[0, np.ones(len(gaps) - 1, dtype=int), 0]
+        extra = visible - len(gaps) + 1
+        spacings = minimum + rng.multinomial(extra, rng.dirichlet(np.ones(len(gaps) + 1)))
+        pos = start + spacings[0]
+        for length, spacing in zip(gaps, spacings[1:]):
+            mask[pos:pos + length] = True
+            pos += length + spacing
+    return mask if baseline is None else mask | np.asarray(baseline, dtype=bool)
+
+
 def make_mask(labels, half, condition, seed, baseline=None):
     """Return a frame mask; 'live' adds gaps to the supplied current mask."""
     labels = np.asarray(labels)
