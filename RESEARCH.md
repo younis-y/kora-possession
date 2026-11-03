@@ -317,18 +317,45 @@ Measure the reverse error: H/A predicted on true D. Include numerators and denom
 
 ### [pending] V5: Which decoder weights improve possession recovery?
 
-**Hypothesis:** Switching costs, duration weights, and boundary bonuses trade missed possessions
-against false fragments.
+**Hypothesis:** Inner selection sits on edges of the HSMM grid `cost_ha (2, 4, 8) × cost_d (8, 16) ×
+w_dur (2, 3, 4) × beta (2, 3, 4)`. Across the 14 folds of Y1 and `b0_w4`, under earlier degradation
+estimates, beta 4 was chosen 12 times, cost_d 16 eight times, and cost_ha 2 in three `b0_w4` folds.
+A wider grid may let inner selection reach settings that recover more short possessions. Lower
+cost_ha makes handovers cheaper. Higher beta raises the bonus at every live segment start where the
+detector exceeds its base rate, including restarts and same-state continuations, and lowers it where
+the detector is below the rate. Its effect is broader than cheaper handovers.
 
-**Experiment:** Vary one group at a time, then freeze a small combined grid. Select settings
-inside inner validation.
+**Pre-registration, round 1 (2026-11-03, before any outer run of this candidate).** Only
+inner-selected settings informed the design. No outer score of a V5 candidate exists.
 
-| Setting | Current HSMM | Proposed values |
-| --- | ---: | --- |
-| `cost_ha` | 8 | 4, 8, 16 |
-| `cost_d` | 8 | 4, 8, 16 |
-| `w_dur` | 2 | 0, 1, 2, 3 |
-| `beta` | 4 | 0, 2, 4, 6 |
+- Candidate `v5_wide` in `kora/variant.py`: HSMM grid `cost_ha (1, 2, 4, 8) × cost_d (8, 16, 32) ×
+  w_dur (2, 3, 4) × beta (2, 3, 4, 6, 8)`, 180 settings. B0's 54 settings come first in their
+  existing order, so a B0 setting wins an exact tie at the maximum inner mean whenever that tie
+  includes a B0 setting. The plain grid and `inner_wins` 5 are unchanged. Features and stage 1
+  are unchanged, so stage-1 caches are reused and detectors are refitted.
+- Base: freeze `PRODUCTION` and its full configuration before either outer run. Explicitly inherit
+  that configuration, changing only `hsmm_grid`. If its plain grid, HSMM grid, or `inner_wins`
+  differs from B0, amend this registration before running. Record the base name, resolved
+  configuration, commit, and any uncommitted diff hash.
+- Run: `python -m kora.nested --variant v5_wide`, then `python -m kora.compare <base> v5_wide`.
+  Seed 2027, with the same code state and evaluation copies for both variants.
+- Decision: keep if the unrounded mean spellF1 difference is positive and at least 5 of 7 matches
+  improve strictly. Ties are not wins. This is a selection rule, not a significance test. One
+  candidate in this round.
+- Pairing check before reading the result: seven matches in the same order, the same versions and
+  seed, and identical truth, half, frame, and visibility arrays in both bundles. `kora.compare`
+  checks match names only.
+- Secondary, reported but not deciding: recall at IoU 0.5 for `<1` s and `1–2` s, precision for
+  predicted spells under 2 s from pooled counts, the predicted-to-true count ratio, spellF1 per IoU,
+  plain or HSMM per fold, and chosen settings on each edge of the new grid, including settings
+  rejected by the gate. Use `kora.errors --predictions` on both bundles for duration and count
+  diagnostics. Use the nested JSON for per-IoU scores, decoder choices, and edge counts.
+- Known limits: the best inner-mean HSMM setting is chosen before the 5-of-6 gate, so a wider grid
+  can move a fold to the plain decoder. A superset grid does not guarantee improvement. Chosen
+  settings on a new edge are recorded and do not trigger another candidate this round.
+- Deployment: `kora.boundary` and `kora.train` keep their own grids for final fitting. A kept result
+  needs a separate change before it reaches the submission.
+- Cost: 7,560 inner `decode_hsmm` calls against 2,268 for B0 (3.3×). Wall time is not yet measured.
 
 **Outcome:** —
 
