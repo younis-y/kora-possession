@@ -15,7 +15,7 @@ Model comparisons depend on Y1.
 
 ## Younis — evaluation and reproducibility
 
-### [pending] Y1: Is the held-out match excluded from the whole fitted pipeline?
+### [verified] Y1: Is the held-out match excluded from the whole fitted pipeline?
 
 **Hypothesis:** Boundary-training inputs can come from first-stage models that saw the outer
 held-out match, creating indirect leakage.
@@ -29,8 +29,32 @@ held-out match, creating indirect leakage.
 3. Include excluded match IDs, configuration versions, and seeds in cache keys.
 4. Recompute `main` with full nested CV.
 
-**Outcome:** Clean baseline pending. Recorded scores `0.7067` (plain), `0.7194` (HSMM), and
-`0.7187` (nested settings) come from the old evaluation.
+**Outcome (2026-11-03, `python -m kora.nested`, commit 3742788, seed 2027, features v3):** clean
+spellF1 **0.7169 ± 0.0304**. Per fold, stage 1 (42 inner fits on 5 matches), detector, prior, rate,
+duration prior and decoder selection use only the 6 inner matches; the 5-of-6 keep rule picks the
+decoder. The old 0.7194 was slightly optimistic (−0.0025).
+
+| Held-out | Decoder chosen | spellF1 | plain | HSMM | IoU 0.3 / 0.5 / 0.7 | true / predicted spells |
+| --- | --- | ---: | ---: | ---: | --- | --- |
+| J03WPY | plain | 0.679 | 0.679 | 0.716 | 0.758 / 0.686 / 0.589 | 421 / 299 |
+| J03WN1 | HSMM | 0.688 | 0.684 | 0.688 | 0.792 / 0.693 / 0.563 | 500 / 371 |
+| J03WMX | HSMM | 0.690 | 0.667 | 0.690 | 0.770 / 0.707 / 0.580 | 511 / 369 |
+| J03WOH | HSMM | 0.767 | 0.747 | 0.767 | 0.844 / 0.770 / 0.672 | 402 / 330 |
+| J03WQQ | HSMM | 0.728 | 0.722 | 0.728 | 0.816 / 0.747 / 0.600 | 401 / 349 |
+| J03WOY | HSMM | 0.719 | 0.692 | 0.719 | 0.809 / 0.730 / 0.616 | 456 / 385 |
+| J03WR9 | HSMM | 0.747 | 0.737 | 0.747 | 0.826 / 0.761 / 0.640 | 370 / 342 |
+
+- HSMM beats plain on all 7 held-out matches (mean 0.7221 vs 0.7040). The keep rule rejected it on
+  the J03WPY fold, which costs 0.005 on the mean; with 6 inner matches the 5-of-6 rule is strict.
+- Every fold predicts 8-29% fewer possessions than the truth: the pipeline merges possessions.
+  This bears on the 150-per-45-min count on the challenge match (see V1 for merge/split counts).
+- Settings chosen per fold are stable: beta 4 everywhere, cost_ha 4-8, cost_d 8-16, w_dur 2-4.
+
+**Artifacts:** `models/nested.json` (settings and scores per fold, committed);
+`nested_predictions.npz`, schema-1 bundle for `kora.errors --predictions`, on the
+[nested-v1 release](https://github.com/younis-y/kora-possession/releases/tag/nested-v1)
+(`gh release download nested-v1 -D models`). Reuse: the 42 inner stage-1 folds are cached as
+`data/cache/oof_v3_{k}_x{m}.npy`, so a decoder-only rerun takes about 15 minutes.
 
 ### [pending] Y2: How much does repeated selection overfit the seven matches?
 
