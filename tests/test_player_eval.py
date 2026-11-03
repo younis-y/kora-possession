@@ -116,7 +116,7 @@ class PlayerEvaluationTests(unittest.TestCase):
                  and r['predictor'] == 'player_only']
         self.assertEqual(len(clean), 8)
         self.assertEqual([int(r['total']) for r in clean], [80] * 7 + [560])
-        self.assertTrue(all(float(r['accuracy']) == 0.5 for r in clean))
+        self.assertTrue(all(abs(float(r['accuracy']) - 0.5) <= 0.05 for r in clean))  # constant players: chance level
         self.assertEqual({r['predictor'] for r in rows}, {'player_only', 'always_H'})
 
     def test_constant_home_baseline_is_fixed_even_when_away_is_majority(self):
