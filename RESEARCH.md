@@ -1,6 +1,6 @@
 # Research log
 
-**Last updated:** 2026-11-02
+**Last updated:** 2026-11-03
 
 **Statuses**
 
@@ -305,14 +305,24 @@ Evaluate on the same held-out matches. Avoid treating full event-derived paths a
 without validating the mapping.
 
 **Outcome:** Metrica's three sample games were published before the 2024 challenge fixture. The
-pinned [2021
-snapshot](https://github.com/metrica-sports/sample-data/tree/e706dd506b360d69d9d123d5b8026e7294b13996)
+pinned [2021 snapshot](https://github.com/metrica-sports/sample-data/tree/e706dd506b360d69d9d123d5b8026e7294b13996)
 contains synchronized Game 3 events and tracking. Of 1,395 CARRY events, 14 opposing-team pairs
 overlap in their interiors, or 23 if touching endpoints count. An inclusive-endpoint audit found 75
 conflicted frames. Endpoint semantics and the mapping to the challenge possession definition remain
 unverified. The source invites community use and requests attribution but has no explicit standard
-licence; clarify reuse terms before depending on it for released training artifacts. No model
-comparison has run.
+licence; clarify reuse terms before depending on it for released training artifacts.
+
+A local, predeclared player-only feasibility comparison used J03WPY as the held-out match,
+mask seed 11, and six German training matches. It added 14,336 mirrored and unmirrored weak
+CARRY rows at weight 0.25 to 314,392 German live rows. Unknown and conflicting anchors were
+excluded. For current simulated gaps on true live frames, Sportec-only was 2,802 / 3,313
+correct (84.58%); Sportec plus Metrica was 2,820 / 3,313 (85.12%). With clean players and
+the same ball mask, the scores were 2,853 / 3,313 (86.12%) and 2,825 / 3,313 (85.27%).
+The result is mixed and does not establish an improvement. This is one match and one mask seed,
+with no fusion or spellF1 measurement. Both models used the same fixed model seed, but adding
+auxiliary rows changed the row-level internal early-stopping split and validation objective.
+A comparison with fixed German-only validation or fixed iterations and the Y1 evaluation is
+needed. No Metrica-trained model has been released.
 
 ### [pending] J5: Are useful tracking measurements discarded?
 
