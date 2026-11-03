@@ -16,8 +16,8 @@ match can download and cache its tracking data.
 
 Independent training changes the ball mask but keeps label-conditioned player degradation.
 Mixed training uses the current mask on even copies and the independent mask on odd copies.
-The optional duration-matched scenario samples unlabeled challenge gap lengths and the pooled
-missing rate. Its placements ignore labels. The last sampled gap can be shortened; retained
+The optional duration-matched scenario samples external (SkillCorner) gap-length quantiles and
+missing share from models/degrade_external.json; it never reads the challenge match. Its placements ignore labels. The last sampled gap can be shortened; retained
 source gaps may increase the realized missing rate or join gaps.
 
 Nested mode accepts only the pinned Y1 summary and bundle and folds that selected the plain
@@ -35,7 +35,7 @@ import warnings
 
 import numpy as np
 
-from .blackout import apply_mask, duration_matched_mask, gap_profile, make_mask, shuffle_gaps, summarize
+from .blackout import apply_mask, duration_matched_mask, make_mask, shuffle_gaps, summarize
 from .decode import decode
 from .degrade import degrade
 from .external import MATCHES, load
@@ -211,7 +211,7 @@ def main():
     parser.add_argument('--nested-plain', action='store_true',
                         help='use Y1 settings for a plain fold and require exact reference parity')
     parser.add_argument('--duration-matched', action='store_true',
-                        help='sample durations and missing rate from unlabeled challenge tracking')
+                        help='sample gap lengths and missing share from models/degrade_external.json')
     parser.add_argument('--conditions', nargs='+', choices=CONDITION_NAMES,
                         help='evaluate only the named conditions')
     args = parser.parse_args()
@@ -228,11 +228,11 @@ def main():
     start = time.monotonic()
     profile = None
     if args.duration_matched:
-        from .target import load_target
-        _, _, target_ball, _, graded = load_target()
-        profile = gap_profile(target_ball, graded)
-        lengths, share = profile
-        print(f'unlabeled target gap profile: {len(lengths)} gaps; missing share {share:.4f}; '
+        ext = json.loads((MODELS / 'degrade_external.json').read_text())
+        lengths = np.maximum(np.rint(np.asarray(ext['gap_s_quantiles']) * 25), 1).astype(np.int64)
+        share = float(ext['missing_share'])
+        profile = lengths, share
+        print(f'external gap profile (SkillCorner quantiles): missing share {share:.4f}; '
               f'median {np.median(lengths) / 25:.2f}s; p90 {np.percentile(lengths, 90) / 25:.2f}s', flush=True)
     print(f'training condition: {args.training_condition}; training seed: {args.training_seed}', flush=True)
     X, y = training_data(args.held_out, args.training_condition, args.training_seed)

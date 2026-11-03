@@ -2,17 +2,10 @@ import unittest
 
 import numpy as np
 
-from kora.blackout import apply_mask, make_mask, summarize, shuffle_gaps, gap_profile, duration_matched_mask
+from kora.blackout import apply_mask, make_mask, summarize, shuffle_gaps, duration_matched_mask
 
 
 class BlackoutTests(unittest.TestCase):
-    def test_gap_profile_uses_only_selected_blocks_and_splits_at_boundaries(self):
-        ball = np.ones((12, 2))
-        ball[[0, 2, 3, 5, 6, 7, 11], :] = np.nan
-        lengths, share = gap_profile(ball, [(1, 6), (6, 10)])
-        np.testing.assert_array_equal(lengths, [2, 1, 2])
-        self.assertAlmostEqual(share, 5 / 9)
-
     def test_duration_matched_masks_are_repeatable_and_preserve_existing_gaps(self):
         half = np.repeat([1, 2], 40000)
         existing = np.zeros(len(half), bool)

@@ -28,26 +28,6 @@ def _random_gaps(n, share, rng):
     return missing
 
 
-def gap_profile(ball, blocks):
-    """Pool gap lengths and missing share from selected, separate tracking blocks."""
-    ball = np.asarray(ball)
-    if ball.ndim != 2 or ball.shape[1] < 2:
-        raise ValueError('ball must have at least two coordinates')
-    lengths, missing, total = [], 0, 0
-    last = 0
-    for start, end in blocks:
-        if not (0 <= start < end <= len(ball)) or start < last:
-            raise ValueError('blocks must be ordered, non-overlapping and in range')
-        mask = ~np.isfinite(ball[start:end, :2]).all(axis=1)
-        lengths.extend(b - a for a, b in stretches(mask))
-        missing += int(mask.sum())
-        total += end - start
-        last = end
-    if not total or not 0 < missing < total:
-        raise ValueError('selected blocks require both visible and missing ball frames')
-    return np.asarray(lengths, dtype=np.int64), missing / total
-
-
 def duration_matched_mask(half, lengths, share, seed, baseline=None):
     """Sample gap lengths without labels; round the share per half and retain baseline gaps.
 
