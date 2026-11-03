@@ -250,7 +250,7 @@ def main():
     else:
         setting = (0., 8., 32.)
         print('PROVISIONAL fixed plain decoder alpha=0 cost_ha=8 cost_d=32; historical selection used all matches')
-    print('match seed condition spell_f1 macro_f1 accuracy live_missing/total dead_missing/total gap_median_s gap_p90_s f1_at_0.3_0.4_0.5_0.6_0.7')
+    print('match seed condition spell_f1 macro_f1 accuracy live_missing/total dead_missing/total gap_median_s gap_p90_s f1_at_0.3_0.4_0.5_0.6_0.7 gap_team_correct/total')
     for seed in args.seeds:
         for name, (players, ball) in conditions(data, seed, profile).items():
             if args.conditions and name not in args.conditions:
@@ -260,13 +260,15 @@ def main():
             pred = decode(proba, segments_of(half), prior, *setting)
             result = scores(labels, pred, half)
             missing = ~np.isfinite(ball[:, :2]).all(axis=1)
+            gap = missing & (labels < 2)
             s = summarize(missing, labels, half)
             lengths = np.asarray(s['gap_frames']) / 25
             median, p90 = np.percentile(lengths, [50, 90]) if len(lengths) else (0, 0)
             print(f"{args.held_out} {seed} {name} {result['spell_f1']:.4f} "
                   f"{result['macro_f1']:.4f} {result['accuracy']:.4f} "
                   f"{s['live_missing']}/{s['live_total']} {s['dead_missing']}/{s['dead_total']} "
-                  f"{median:.2f} {p90:.2f} " + ','.join(f'{x:.4f}' for x in result['spell_f1_by_iou']), flush=True)
+                  f"{median:.2f} {p90:.2f} " + ','.join(f'{x:.4f}' for x in result['spell_f1_by_iou']) +
+                  f" {int((proba[gap, :2].argmax(1) == labels[gap]).sum())}/{int(gap.sum())}", flush=True)
 
 
 if __name__ == '__main__':
