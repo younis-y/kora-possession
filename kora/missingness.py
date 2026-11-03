@@ -19,8 +19,17 @@ RESEARCH.md Y5 records that.
 Each training copy draws a severity s ~ U(0, 1) and scales every process by it, from clean corrected
 tracking (s = 0) to SkillCorner automatic tracking (s = 1). Nothing here reads the challenge match.
 
-    python -m kora.missingness       # writes models/degrade_external.json
+    python -m kora.missingness                    # every frame (the rule in use): models/degrade_external.json
+    python -m kora.missingness --frames camera    # candidate: frames with a detected player only
+    python -m kora.missingness --check            # pre-registered external-only choice between the two
+
+The check (RESEARCH.md Y5, pre-registered 2026-11-03): degrade the seven IDSSE matches at full severity
+with each candidate, build the missingness features, and train a classifier to tell them from real
+SkillCorner tracking. Seven folds hold out one IDSSE match and every 7th SkillCorner match. The candidate
+with the lower mean AUC looks more like real automatic tracking and is used; a difference under 0.01
+keeps the every-frame rule. No challenge data is read.
 """
+import argparse
 import json
 from pathlib import Path
 
@@ -64,8 +73,9 @@ def idsse_second_diff_var():
     return float(np.mean(var))
 
 
-def measure_skillcorner():
-    """Pooled over the twenty matches, per half, every frame of the period, 10 fps."""
+def measure_skillcorner(camera_only=False):
+    """Pooled over the twenty matches, per half, 10 fps: every frame of the period, or only frames with
+    a detected player when camera_only (cuts and replays dropped, the frames either side joined)."""
     n = dict(miss_owner=0, owner=0, miss_free=0, free=0)
     live_gaps, all_gaps, start_off, end_off = [], [], [], []
     vis_runs, gap_runs, closeup, stoppages, radius, var = [], [], 0, 0, [], []
@@ -74,6 +84,9 @@ def measure_skillcorner():
         for h in (1, 2):
             i = d["half"] == h
             P, B, L = d["players"][i], d["ball"][i], d["label"][i]
+            if camera_only:
+                on = np.isfinite(P[:, :, 0]).any(1)
+                P, B, L = P[on], B[on], L[on]
             seen_p = np.isfinite(P[:, :, 0])
             miss = ~np.isfinite(B[:, 0])
             known = L != skillcorner.UNKNOWN
@@ -117,14 +130,70 @@ def quantiles(x):
     return [round(float(v), 3) for v in np.quantile(x, QUANTILES)]
 
 
+CHECK_FEATURES = ("b_seen", "t_since", "t_until", "nH", "nA")      # plus every b_seen_* window
+CHECK_STEP = 25                                                     # one frame per second
+CANDIDATES = {"every frame": OUT, "camera on": OUT.with_name("degrade_external_camera.json")}
+
+
+def check_features(players, team, ball, half):
+    from .features import build
+    f = build(players, team, ball, half)
+    cols = list(CHECK_FEATURES) + [c for c in f.columns if c.startswith("b_seen_")]
+    return f[cols].to_numpy()[::CHECK_STEP]
+
+
+def check():
+    """Pre-registered external-only choice between the candidate parameter files (see module docstring)."""
+    from sklearn.ensemble import HistGradientBoostingClassifier
+    from sklearn.metrics import roc_auc_score
+    from . import degrade as dg
+    sc_ids = list(skillcorner.MATCHES)
+    real = {m: check_features(*(lambda d: (d["players"], d["team"], d["ball"], d["half"]))(skillcorner.load(m)))
+            for m in sc_ids}
+    result = {}
+    for name, path in CANDIDATES.items():
+        dg.PARAMS = json.loads(path.read_text())
+        sim = {}
+        for k, m in enumerate(IDSSE):
+            d = load_idsse(m)
+            p, b = dg.degrade(d["players"], d["ball"], d["label"], np.random.default_rng([2027, k]), severity=1.0)
+            sim[m] = check_features(p, d["team"], b, d["half"])
+        aucs = []
+        for k, m in enumerate(IDSSE):
+            test_sc = sc_ids[k::len(IDSSE)]
+            Xtr = np.concatenate([sim[j] for j in IDSSE if j != m] + [real[s] for s in sc_ids if s not in test_sc])
+            ytr = np.concatenate([np.zeros(len(sim[j])) for j in IDSSE if j != m] +
+                                 [np.ones(len(real[s])) for s in sc_ids if s not in test_sc])
+            Xte = np.concatenate([sim[m]] + [real[s] for s in test_sc])
+            yte = np.concatenate([np.zeros(len(sim[m]))] + [np.ones(len(real[s])) for s in test_sc])
+            clf = HistGradientBoostingClassifier(max_iter=200, random_state=2027).fit(Xtr, ytr)
+            aucs.append(roc_auc_score(yte, clf.predict_proba(Xte)[:, 1]))
+        result[name] = aucs
+        print(f"{name}: AUC per fold " + " ".join(f"{a:.3f}" for a in aucs) + f"  mean {np.mean(aucs):.4f}", flush=True)
+    every, camera = np.mean(result["every frame"]), np.mean(result["camera on"])
+    winner = "camera on" if camera < every - 0.01 else "every frame"
+    print(f"decision (lower AUC wins, ties within 0.01 keep every frame): {winner}")
+    return result, winner
+
+
 def main():
-    sc = measure_skillcorner()
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--frames", choices=("all", "camera"), default="all")
+    parser.add_argument("--check", action="store_true")
+    args = parser.parse_args()
+    if args.check:
+        check()
+        return
+    camera = args.frames == "camera"
+    out_path = CANDIDATES["camera on" if camera else "every frame"]
+    sc = measure_skillcorner(camera_only=camera)
     var_id = idsse_second_diff_var()
     n = sc["n"]
     noise = float(np.sqrt(max(0.0, (sc["var"] - var_id) / 6)))      # white noise adds 6 sigma^2
     out = {
-        "_source": "kora/missingness.py on SkillCorner open data (commit " + skillcorner.COMMIT + ", every "
-                   "frame of both periods) and the seven IDSSE matches; no challenge data. Each copy draws "
+        "_source": "kora/missingness.py on SkillCorner open data (commit " + skillcorner.COMMIT + ", " +
+                   ("frames with a detected player" if camera else "every frame of both periods") +
+                   ") and the seven IDSSE matches; no challenge data. Each copy draws "
                    "severity s ~ U(0,1) and scales every process by it (s = 0 clean IDSSE, s = 1 SkillCorner).",
         "p_miss_dead": n["miss_free"] / n["free"],          # stoppage proxy: no possession owner
         "p_miss_alive": n["miss_owner"] / n["owner"],
@@ -145,7 +214,7 @@ def main():
             "second_diff_var": {"idsse": var_id, "skillcorner": sc["var"]},
         },
     }
-    OUT.write_text(json.dumps(out, indent=1))
+    out_path.write_text(json.dumps(out, indent=1))
     print(json.dumps({k: v for k, v in out.items() if not k.endswith("quantiles")}, indent=1))
     for name, x in (("live ball gaps", sc["live_gaps"]), ("all ball gaps", sc["all_gaps"]),
                     ("player gaps", sc["gap"]), ("stoppage start offset", sc["start_off"]),

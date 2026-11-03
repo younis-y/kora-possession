@@ -116,9 +116,24 @@ severity s ~ U(0, 1) that scales every process from clean IDSSE (0) to SkillCorn
 The duration-matched stress test on José's branch still samples challenge gap lengths; it must move to `gap_s_quantiles` / `missing_share` in the external JSON before it is used again. Caches are keyed by a hash of
 the feature and degradation code plus the external parameters (`kora/variant.py`).
 
-**Run R0 (pre-registered 2026-11-03):** `python -m kora.nested --variant b0`. This is the new
-baseline B0. No keep rule applies: it replaces Y1 because Y1 is not compliant. Inner HSMM-vs-plain
-rule changes from 5 of 6 to 4 of 6 inner wins from this run on.
+**Which estimate: external-only rule (pre-registered 2026-11-03, before running; raised by Vladymyr).**
+Nested CV cannot choose between the estimates: each variant is graded on evaluation copies degraded its
+own way. `python -m kora.missingness --check` degrades the seven IDSSE matches at full severity with each
+candidate (`degrade_external.json` every frame, `degrade_external_camera.json` frames with a detected
+player, both with the no-owner stoppage proxy), builds the missingness features (`b_seen`, `t_since`,
+`t_until`, `nH`, `nA` and every `b_seen_*` window, one frame per second) and trains a classifier to tell
+them from real SkillCorner tracking. Seven folds each hold out one IDSSE match and every 7th SkillCorner
+match. **Lower mean AUC wins; a difference under 0.01 keeps the every-frame rule.** If the camera-on
+candidate wins, R0 is rerun in full with it.
+
+**Inner HSMM rule (corrected 2026-11-03, raised by Vladymyr).** The change to 4 of 6 was motivated by
+the J03WPY outer result in Y1, which is selection on an outer score. The reference stays at **5 of 6**;
+4 of 6 is the exploratory variant `b0_w4`. Grids and the rule now come from `kora.variant.DECODER`.
+
+**Run R0 (2026-11-03, 13:58-16:34, commit 1cd8d1e code, features f971ad3ea2e):** ran with 4 of 6 before the
+correction, so it is the `b0_w4` result: clean spellF1 **0.6889 ± 0.0224**, per match 0.710 0.661 0.669
+0.676 0.674 0.714 0.718 (HSMM on all 7 folds). The reference B0 (5 of 6) is a decoder-only rerun on the
+same cached stage 1.
 
 **Outcome:** —
 

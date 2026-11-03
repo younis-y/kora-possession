@@ -1,0 +1,325 @@
+{
+  "schema": 1,
+  "fps": 25,
+  "matches": [
+    "J03WPY",
+    "J03WN1",
+    "J03WMX",
+    "J03WOH",
+    "J03WQQ",
+    "J03WOY",
+    "J03WR9"
+  ],
+  "provenance": "kora.nested: each held-out match excluded from stage 1, the detector, the prior, the rate, the duration prior and decoder selection; scored once. Ball and player gaps are simulated from external measurements (kora/degrade.py), not challenge tracking.",
+  "commit": "d31523b75a94c473694728dab232565276d27651",
+  "dirty": false,
+  "seed": 2027,
+  "variant": "b0_w4",
+  "config": {},
+  "feature_version": "f971ad3ea2e",
+  "stage1_version": "f971ad3ea2es7875b277a4",
+  "inner_wins": 4,
+  "train_copies": 2,
+  "subsample": 6,
+  "spell_f1_mean": 0.6889041548251112,
+  "spell_f1_std": 0.0224147600305839,
+  "spell_f1_plain_mean": 0.6807799333751365,
+  "spell_f1_hsmm_mean": 0.6889041548251112,
+  "folds": {
+    "J03WPY": {
+      "inner_matches": [
+        "J03WN1",
+        "J03WMX",
+        "J03WOH",
+        "J03WQQ",
+        "J03WOY",
+        "J03WR9"
+      ],
+      "decoder": "hsmm",
+      "plain": {
+        "alpha": 1.0,
+        "cost_ha": 8,
+        "cost_d": 64,
+        "inner_mean": 0.6767361718603873
+      },
+      "hsmm": {
+        "cost_ha": 4,
+        "cost_d": 16,
+        "w_dur": 2,
+        "beta": 3,
+        "inner_mean": 0.6843499582331175,
+        "rate": 0.02536110238504319
+      },
+      "prior": [
+        0.27531683258489154,
+        0.27531683258489154,
+        0.449366334830217
+      ],
+      "spell_f1": 0.7104084321475626,
+      "spell_f1_per_iou": {
+        "0.3": 0.7799736495388668,
+        "0.4": 0.7457180500658761,
+        "0.5": 0.7114624505928854,
+        "0.6": 0.6719367588932806,
+        "0.7": 0.6429512516469039
+      },
+      "n_true": 421,
+      "n_pred": 338,
+      "spell_f1_plain": 0.6991957104557642,
+      "spell_f1_hsmm": 0.7104084321475626
+    },
+    "J03WN1": {
+      "inner_matches": [
+        "J03WPY",
+        "J03WMX",
+        "J03WOH",
+        "J03WQQ",
+        "J03WOY",
+        "J03WR9"
+      ],
+      "decoder": "hsmm",
+      "plain": {
+        "alpha": 1.0,
+        "cost_ha": 8,
+        "cost_d": 64,
+        "inner_mean": 0.6792837569775748
+      },
+      "hsmm": {
+        "cost_ha": 8,
+        "cost_d": 16,
+        "w_dur": 2,
+        "beta": 4,
+        "inner_mean": 0.6889556157808595,
+        "rate": 0.024345902436094056
+      },
+      "prior": [
+        0.2814494551130188,
+        0.2814494551130188,
+        0.4371010897739625
+      ],
+      "spell_f1": 0.6605381165919283,
+      "spell_f1_per_iou": {
+        "0.3": 0.7556053811659192,
+        "0.4": 0.7286995515695067,
+        "0.5": 0.6748878923766816,
+        "0.6": 0.6053811659192826,
+        "0.7": 0.5381165919282511
+      },
+      "n_true": 500,
+      "n_pred": 392,
+      "spell_f1_plain": 0.6695356738391847,
+      "spell_f1_hsmm": 0.6605381165919283
+    },
+    "J03WMX": {
+      "inner_matches": [
+        "J03WPY",
+        "J03WN1",
+        "J03WOH",
+        "J03WQQ",
+        "J03WOY",
+        "J03WR9"
+      ],
+      "decoder": "hsmm",
+      "plain": {
+        "alpha": 0.0,
+        "cost_ha": 8,
+        "cost_d": 32,
+        "inner_mean": 0.6818149287186458
+      },
+      "hsmm": {
+        "cost_ha": 2,
+        "cost_d": 16,
+        "w_dur": 4,
+        "beta": 4,
+        "inner_mean": 0.6897238996902392,
+        "rate": 0.024309798472450992
+      },
+      "prior": [
+        0.273003599893544,
+        0.273003599893544,
+        0.453992800212912
+      ],
+      "spell_f1": 0.6689419795221843,
+      "spell_f1_per_iou": {
+        "0.3": 0.757679180887372,
+        "0.4": 0.7258248009101251,
+        "0.5": 0.6916951080773606,
+        "0.6": 0.6211604095563141,
+        "0.7": 0.5483503981797496
+      },
+      "n_true": 511,
+      "n_pred": 368,
+      "spell_f1_plain": 0.6577272727272727,
+      "spell_f1_hsmm": 0.6689419795221843
+    },
+    "J03WOH": {
+      "inner_matches": [
+        "J03WPY",
+        "J03WN1",
+        "J03WMX",
+        "J03WQQ",
+        "J03WOY",
+        "J03WR9"
+      ],
+      "decoder": "hsmm",
+      "plain": {
+        "alpha": 0.0,
+        "cost_ha": 8,
+        "cost_d": 128,
+        "inner_mean": 0.6785209568564493
+      },
+      "hsmm": {
+        "cost_ha": 8,
+        "cost_d": 8,
+        "w_dur": 2,
+        "beta": 4,
+        "inner_mean": 0.688811043311365,
+        "rate": 0.025328996752386843
+      },
+      "prior": [
+        0.277972282499428,
+        0.277972282499428,
+        0.4440554350011439
+      ],
+      "spell_f1": 0.6760487144790257,
+      "spell_f1_per_iou": {
+        "0.3": 0.7740189445196212,
+        "0.4": 0.7307171853856564,
+        "0.5": 0.6874154262516915,
+        "0.6": 0.6359945872801083,
+        "0.7": 0.5520974289580514
+      },
+      "n_true": 402,
+      "n_pred": 337,
+      "spell_f1_plain": 0.6637837837837838,
+      "spell_f1_hsmm": 0.6760487144790257
+    },
+    "J03WQQ": {
+      "inner_matches": [
+        "J03WPY",
+        "J03WN1",
+        "J03WMX",
+        "J03WOH",
+        "J03WOY",
+        "J03WR9"
+      ],
+      "decoder": "hsmm",
+      "plain": {
+        "alpha": 1.0,
+        "cost_ha": 8,
+        "cost_d": 32,
+        "inner_mean": 0.6837509705250676
+      },
+      "hsmm": {
+        "cost_ha": 2,
+        "cost_d": 16,
+        "w_dur": 4,
+        "beta": 4,
+        "inner_mean": 0.6915501597343773,
+        "rate": 0.025464311609917713
+      },
+      "prior": [
+        0.27240297102207345,
+        0.27240297102207345,
+        0.4551940579558531
+      ],
+      "spell_f1": 0.6744063324538259,
+      "spell_f1_per_iou": {
+        "0.3": 0.7730870712401055,
+        "0.4": 0.7203166226912928,
+        "0.5": 0.6912928759894459,
+        "0.6": 0.6437994722955145,
+        "0.7": 0.5435356200527705
+      },
+      "n_true": 401,
+      "n_pred": 357,
+      "spell_f1_plain": 0.6626788036410923,
+      "spell_f1_hsmm": 0.6744063324538259
+    },
+    "J03WOY": {
+      "inner_matches": [
+        "J03WPY",
+        "J03WN1",
+        "J03WMX",
+        "J03WOH",
+        "J03WQQ",
+        "J03WR9"
+      ],
+      "decoder": "hsmm",
+      "plain": {
+        "alpha": 0.0,
+        "cost_ha": 8,
+        "cost_d": 32,
+        "inner_mean": 0.6770579702120637
+      },
+      "hsmm": {
+        "cost_ha": 2,
+        "cost_d": 8,
+        "w_dur": 3,
+        "beta": 3,
+        "inner_mean": 0.6828764351252504,
+        "rate": 0.024925699465665318
+      },
+      "prior": [
+        0.27717398886672157,
+        0.27717398886672157,
+        0.4456520222665569
+      ],
+      "spell_f1": 0.7139479905437353,
+      "spell_f1_per_iou": {
+        "0.3": 0.8014184397163121,
+        "0.4": 0.7730496453900709,
+        "0.5": 0.7328605200945626,
+        "0.6": 0.6666666666666667,
+        "0.7": 0.5957446808510639
+      },
+      "n_true": 456,
+      "n_pred": 390,
+      "spell_f1_plain": 0.7055753262158956,
+      "spell_f1_hsmm": 0.7139479905437353
+    },
+    "J03WR9": {
+      "inner_matches": [
+        "J03WPY",
+        "J03WN1",
+        "J03WMX",
+        "J03WOH",
+        "J03WQQ",
+        "J03WOY"
+      ],
+      "decoder": "hsmm",
+      "plain": {
+        "alpha": 0.0,
+        "cost_ha": 16,
+        "cost_d": 32,
+        "inner_mean": 0.6785448306964669
+      },
+      "hsmm": {
+        "cost_ha": 4,
+        "cost_d": 16,
+        "w_dur": 3,
+        "beta": 4,
+        "inner_mean": 0.6831862489518952,
+        "rate": 0.025931087025074517
+      },
+      "prior": [
+        0.2733015051773333,
+        0.2733015051773333,
+        0.45339698964533337
+      ],
+      "spell_f1": 0.718037518037518,
+      "spell_f1_per_iou": {
+        "0.3": 0.8167388167388168,
+        "0.4": 0.7821067821067821,
+        "0.5": 0.7272727272727273,
+        "0.6": 0.658008658008658,
+        "0.7": 0.606060606060606
+      },
+      "n_true": 370,
+      "n_pred": 323,
+      "spell_f1_plain": 0.706962962962963,
+      "spell_f1_hsmm": 0.718037518037518
+    }
+  },
+  "renamed_from": "nested_b0.json of run R0 (2026-11-03), which ran with inner_wins 4 before the reference rule was set back to 5; it is the b0_w4 result (b0_w4 shares b0 stage 1)."
+}
