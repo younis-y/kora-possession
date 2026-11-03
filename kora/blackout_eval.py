@@ -3,6 +3,7 @@
     OMP_NUM_THREADS=1 python -m kora.blackout_eval --held-out J03WPY --seeds 11 22 33
     OMP_NUM_THREADS=1 python -m kora.blackout_eval --held-out J03WPY --training-condition independent
     OMP_NUM_THREADS=1 python -m kora.blackout_eval --held-out J03WPY --duration-matched
+    OMP_NUM_THREADS=1 python -m kora.blackout_eval --held-out J03WPY --nested-plain --duration-matched
 
 The classifier is trained on six other matches with the existing degradation and
 mirroring. The plain decoder uses fixed historical costs (H/A 8, D 32, alpha 0),
@@ -17,8 +18,13 @@ Independent training changes the ball mask but keeps label-conditioned player de
 The optional duration-matched scenario samples unlabeled challenge gap lengths and the pooled
 missing rate. Its placements ignore labels. The last sampled gap can be shortened; retained
 source gaps may increase the realized missing rate or join gaps.
+
+Nested mode accepts only the pinned Y1 summary and bundle and folds that selected the plain
+decoder. It requires baseline decoded-path and alignment parity, which does not prove model
+probability identity. Its stress scores are not a fresh seven-match nested evaluation.
 """
 import argparse
+import hashlib
 import json
 from pathlib import Path
 import re
@@ -44,6 +50,8 @@ CONDITION_NAMES = ('clean', 'clean_ball', 'current', 'independent', 'live', 'liv
                    'clean_players_shuffled_current', 'duration_matched',
                    'clean_players_duration_matched')
 DURATION_CONDITIONS = ('duration_matched', 'clean_players_duration_matched')
+Y1_SUMMARY_SHA256 = '65203af20938c8824ddd0a7ea3707508864db02b0860ef1ff9d0d137f24f39ff'
+Y1_BUNDLE_SHA256 = 'd54d02b2dccf7b56f986747f913db88722286394d313155cdd81710fafa44535'
 
 
 def nested_plain_settings(summary, meta, held_out):
@@ -79,9 +87,19 @@ def verify_reference_arrays(reference, actual):
             raise ValueError(f'Y1 parity failed for {key}')
 
 
+def verify_y1_digest(path, expected):
+    with path.open('rb') as source:
+        actual = hashlib.file_digest(source, 'sha256').hexdigest()
+    if actual != expected:
+        raise ValueError(f'Y1 artifact digest mismatch: {path.name}')
+
+
 def load_y1(held_out):
-    summary = json.loads((MODELS / 'nested.json').read_text())
-    with np.load(MODELS / 'nested_predictions.npz', allow_pickle=False) as bundle:
+    summary_path, bundle_path = MODELS / 'nested.json', MODELS / 'nested_predictions.npz'
+    verify_y1_digest(summary_path, Y1_SUMMARY_SHA256)
+    verify_y1_digest(bundle_path, Y1_BUNDLE_SHA256)
+    summary = json.loads(summary_path.read_text())
+    with np.load(bundle_path, allow_pickle=False) as bundle:
         meta = json.loads(str(bundle['meta']))
         prior, setting = nested_plain_settings(summary, meta, held_out)
         reference = {k: bundle[f'{held_out}__{k}'].copy()
@@ -225,7 +243,7 @@ def main():
     if nested:
         prior, setting, reference, commit = nested
         verify_y1_model(model, data, args.held_out, prior, setting, reference)
-        print(f'Y1 exact parity verified; fold {args.held_out}; commit {commit}; '
+        print(f'Y1 baseline decoded path and alignment parity verified; fold {args.held_out}; commit {commit}; '
               f'plain settings alpha={setting[0]} cost_ha={setting[1]} cost_d={setting[2]}', flush=True)
     else:
         setting = (0., 8., 32.)

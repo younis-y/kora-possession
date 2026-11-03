@@ -2,6 +2,8 @@ import unittest
 import hashlib
 import copy
 import subprocess
+import tempfile
+from pathlib import Path
 import sys
 from unittest.mock import patch
 
@@ -10,7 +12,7 @@ import pandas as pd
 import numpy as np
 
 from kora.blackout_eval import (conditions, training_matches, scores, training_data,
-                               nested_plain_settings, verify_reference_arrays)
+                               nested_plain_settings, verify_reference_arrays, verify_y1_digest)
 from kora.external import MATCHES
 
 
@@ -109,6 +111,16 @@ class BlackoutEvaluationTests(unittest.TestCase):
             nested_plain_settings(summary, {**meta, 'seed': 8}, 'J03WPY')
         with self.assertRaisesRegex(ValueError, 'metadata'):
             nested_plain_settings({**summary, 'dirty': True}, {**meta, 'dirty': True}, 'J03WPY')
+
+    def test_y1_digest_rejects_modified_artifact(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as folder:
+            path = Path(folder) / 'artifact'
+            path.write_bytes(b'expected')
+            digest = hashlib.sha256(b'expected').hexdigest()
+            verify_y1_digest(path, digest)
+            path.write_bytes(b'modified')
+            with self.assertRaisesRegex(ValueError, 'digest'):
+                verify_y1_digest(path, digest)
 
     def test_reference_requires_exact_path_and_alignment(self):
         reference = {'y_true': np.array([0, 2, 1]), 'y_pred': np.array([0, 2, 1]),
