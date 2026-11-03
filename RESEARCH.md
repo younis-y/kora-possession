@@ -344,6 +344,31 @@ so these are paired comparisons, not nested scores. Degradation is pre-Y5. Next:
 as a variant on B0 (label-independent gaps on odd training copies) and score it with
 `kora.nested` + `kora.compare` after R0. Logs: `data/j1-mixed/` (local).
 
+### [pending] J6: Does mixed training beat B0 when the ball goes missing at random?
+
+**Hypothesis:** J1's gain carries over to the external degradation (Y5): training copies whose ball
+gaps ignore the labels make the model less dependent on "ball missing means stoppage".
+
+**Candidates (pre-registered 2026-11-03, before any code or outer score):**
+
+- `mixed`: production variant + odd training copies get random ball gaps instead of the degraded
+  ball mask. Players stay degraded as in B0.
+- Random gaps: `kora.blackout.duration_matched_mask`, lengths from `gap_s_quantiles` and share from
+  `missing_share` in `models/degrade_external.json` (SkillCorner, external), placed without labels,
+  seed per match and copy. J1 used 2 s geometric gaps instead; this run uses the external profile.
+- Random-gap test: `b0_rand` and `mixed_rand` are `b0` and `mixed` with the held-out (and inner)
+  evaluation copy masked the same way. Decoder selection then also sees random gaps.
+- If R1/R2 change `PRODUCTION`, the same switches go on top of the new production variant.
+
+**Decision rule (agreed with Younis):** keep `mixed` if both hold:
+
+1. `python -m kora.compare b0_rand mixed_rand`: better on at least 5 of 7 matches.
+2. `python -m kora.compare b0 mixed`: mean spellF1 drops by no more than 0.01.
+
+Secondary, reported but not deciding: means, short-possession recall, count ratio.
+
+**Outcome:** —
+
 ### [dropped] J2: Can player movement identify possession during ball gaps?
 
 **Hypothesis:** Player geometry and movement can provide evidence without reconstructing ball coordinates.
