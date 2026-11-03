@@ -353,9 +353,12 @@ gaps ignore the labels make the model less dependent on "ball missing means stop
 
 - `mixed`: production variant + odd training copies get random ball gaps instead of the degraded
   ball mask. Players stay degraded as in B0.
-- Random gaps: `kora.blackout.duration_matched_mask`, lengths from `gap_s_quantiles` and share from
-  `missing_share` in `models/degrade_external.json` (SkillCorner, external), placed without labels,
-  seed per match and copy. J1 used 2 s geometric gaps instead; this run uses the external profile.
+- Random gaps: `kora.degrade.random_ball`, lengths drawn from `gap_s_quantiles`, placed uniformly
+  without labels in each half until `missing_share` of its frames is spent (overlaps allowed, so the
+  realised share is a little lower); both values from `models/degrade_external.json` (SkillCorner,
+  external). Own seed per match and copy, so the B0 draws stay identical. J1 used 2 s geometric
+  gaps instead; this run uses the external profile. (Amended before any code or run: first draft
+  named `kora.blackout.duration_matched_mask`, which is not on `main`.)
 - Random-gap test: `b0_rand` and `mixed_rand` are `b0` and `mixed` with the held-out (and inner)
   evaluation copy masked the same way. Decoder selection then also sees random gaps.
 - If R1/R2 change `PRODUCTION`, the same switches go on top of the new production variant.
