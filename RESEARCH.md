@@ -15,7 +15,7 @@ Model comparisons depend on Y1.
 
 ## Younis — evaluation and reproducibility
 
-### [pending] Y1: Is the held-out match excluded from the whole fitted pipeline?
+### [verified] Y1: Is the held-out match excluded from the whole fitted pipeline?
 
 **Hypothesis:** Boundary-training inputs can come from first-stage models that saw the outer
 held-out match, creating indirect leakage.
@@ -29,8 +29,32 @@ held-out match, creating indirect leakage.
 3. Include excluded match IDs, configuration versions, and seeds in cache keys.
 4. Recompute `main` with full nested CV.
 
-**Outcome:** Clean baseline pending. Recorded scores `0.7067` (plain), `0.7194` (HSMM), and
-`0.7187` (nested settings) come from the old evaluation.
+**Outcome (2026-11-03, `python -m kora.nested`, commit 3742788, seed 2027, features v3):** clean
+spellF1 **0.7169 ± 0.0304**. Per fold, stage 1 (42 inner fits on 5 matches), detector, prior, rate,
+duration prior and decoder selection use only the 6 inner matches; the 5-of-6 keep rule picks the
+decoder. The old 0.7194 was slightly optimistic (−0.0025).
+
+| Held-out | Decoder chosen | spellF1 | plain | HSMM | IoU 0.3 / 0.5 / 0.7 | true / predicted spells |
+| --- | --- | ---: | ---: | ---: | --- | --- |
+| J03WPY | plain | 0.679 | 0.679 | 0.716 | 0.758 / 0.686 / 0.589 | 421 / 299 |
+| J03WN1 | HSMM | 0.688 | 0.684 | 0.688 | 0.792 / 0.693 / 0.563 | 500 / 371 |
+| J03WMX | HSMM | 0.690 | 0.667 | 0.690 | 0.770 / 0.707 / 0.580 | 511 / 369 |
+| J03WOH | HSMM | 0.767 | 0.747 | 0.767 | 0.844 / 0.770 / 0.672 | 402 / 330 |
+| J03WQQ | HSMM | 0.728 | 0.722 | 0.728 | 0.816 / 0.747 / 0.600 | 401 / 349 |
+| J03WOY | HSMM | 0.719 | 0.692 | 0.719 | 0.809 / 0.730 / 0.616 | 456 / 385 |
+| J03WR9 | HSMM | 0.747 | 0.737 | 0.747 | 0.826 / 0.761 / 0.640 | 370 / 342 |
+
+- HSMM beats plain on all 7 held-out matches (mean 0.7221 vs 0.7040). The keep rule rejected it on
+  the J03WPY fold, which costs 0.005 on the mean; with 6 inner matches the 5-of-6 rule is strict.
+- Every fold predicts 8-29% fewer possessions than the truth: the pipeline merges possessions.
+  This bears on the 150-per-45-min count on the challenge match (see V1 for merge/split counts).
+- Settings chosen per fold are stable: beta 4 everywhere, cost_ha 4-8, cost_d 8-16, w_dur 2-4.
+
+**Artifacts:** `models/nested.json` (settings and scores per fold, committed);
+`nested_predictions.npz`, schema-1 bundle for `kora.errors --predictions`, on the
+[nested-v1 release](https://github.com/younis-y/kora-possession/releases/tag/nested-v1)
+(`gh release download nested-v1 -D models`). Reuse: the 42 inner stage-1 folds are cached as
+`data/cache/oof_v3_{k}_x{m}.npy`, so a decoder-only rerun takes about 15 minutes.
 
 ### [pending] Y2: How much does repeated selection overfit the seven matches?
 
@@ -105,6 +129,16 @@ false predictions.
   many-to-many, weak overlaps, erased opposite possessions, adjacent halves, X handling,
   normalisation, and bundle validation.
 
+**Provisional result on Y1 predictions** (`nested-v1` release, SHA-256 `d54d02b2…`, which reproduces spellF1 0.7169 ± 0.0304). Y1's degradation values were measured on the challenge tracking, which the organisers' 3 Nov rules do not allow for training. These figures are a pipeline check until the B0 bundle is available.
+
+- 3,061 true and 2,445 predicted possessions over the seven matches, 20% too few (206 against
+  165 per 45 minutes).
+- At IoU 0.5, 2,000 are matched, 1,061 true spells are missed, and 445 predicted spells are
+  unmatched.
+- Under the declared association rule, 226 merge components cover 481 true spells, all with
+  opposite-team gaps, versus 42 split components, all with wrong-team gaps. No split component
+  has a false D gap. Another 534 true spells have no retained same-team overlap.
+
 ### [pending] V2: Are short possessions missing or mistimed?
 
 **Hypothesis:** IoU 0.5 alone hides the difference between missed possessions and inaccurate boundaries.
@@ -122,6 +156,15 @@ one second on clean predictions.
 - Checks: group edges, cross-group pairs, empty groups, totals against the official scorer,
   and extra fragments lowering precision without changing recall.
 - The one-fifth recall below one second still needs clean predictions.
+
+**Provisional result on Y1 predictions** (`nested-v1` release, SHA-256 `d54d02b2…`, which reproduces spellF1 0.7169 ± 0.0304). Y1's degradation values were measured on the challenge tracking, which the organisers' 3 Nov rules do not allow for training. These figures are a pipeline check until the B0 bundle is available.
+
+- Recall at IoU 0.5 by true duration: `<1` s 0.180 (384 spells), `1–2` s 0.445 (535), `2–4` s
+  0.623 (702), `4–8` s 0.785 (620), `8–15` s 0.900 (438), `15+` s 0.982 (382). The one-fifth
+  recall below one second holds on these predictions.
+- Precision at IoU 0.5 by predicted duration: `<1` s 0.638 (130 spells), `1–2` s 0.645 (330),
+  `15+` s 0.959 (413). Short possessions are mostly missed rather than invented: 130 predicted
+  below one second against 384 true.
 
 ### [pending] V3: Which transition types fail, and by how much?
 
@@ -147,6 +190,22 @@ their share of all wrong frames, and overlapping windows.
 - Checks: timing offsets at both tolerances, type confusion, transitions across adjacent
   halves, both ambiguity cases, window overlap and clipping, and pooled quantiles.
 
+**Provisional result on Y1 predictions** (`nested-v1` release, SHA-256 `d54d02b2…`, which reproduces spellF1 0.7169 ± 0.0304). Y1's degradation values were measured on the challenge tracking, which the organisers' 3 Nov rules do not allow for training. These figures are a pipeline check until the B0 bundle is available.
+
+- At 25 frames: H↔A recall 0.531 and precision 0.720 (2,351 true, 1,734 predicted). H/A→D 0.669
+  and 0.669 (710 and 710). D→H/A 0.966 and 0.967 (699 and 698).
+- Among handovers matched within 25 frames, median absolute error is 2 frames, p90 is 15 frames,
+  and mean signed error is −0.4 frames. These statistics describe only matched events.
+- Of 235 stoppages missed under exact pairs at tolerance 25 frames, 216 have a predicted
+  stoppage within 1 s whose preceding team is wrong. This identifies a preceding-team mismatch
+  near the stoppage. The V7 audit separately found 36 of 41 affected handover targets just
+  before stoppages. The relationship between these findings remains untested.
+- Wrong frames: 58% lie within 1 s of a handover, 14% within 1 s of a stoppage, and 2% within
+  1 s of a restart (inclusive rows). 68% lie in any window, which reproduces the earlier figure.
+  32% lie outside all windows.
+- Restart timing (p90 1 frame) may be flattered by the simulated blackouts, which are placed
+  mostly in dead ball.
+
 ### [pending] V4: How often is D predicted during live play?
 
 **Hypothesis:** The reported 2% of errors on true dead ball excludes false D during possession.
@@ -163,6 +222,14 @@ Measure the reverse error: H/A predicted on true D. Include numerators and denom
   simulated blackout, not challenge tracking.
 - Checks: hand-computed rows, X on live frames, zero denominators, and agreement with
   `pm.confusion`.
+
+**Provisional result on Y1 predictions** (`nested-v1` release, SHA-256 `d54d02b2…`, which reproduces spellF1 0.7169 ± 0.0304). Y1's degradation values were measured on the challenge tracking, which the organisers' 3 Nov rules do not allow for training. These figures are a pipeline check until the B0 bundle is available.
+
+- False D during live play: 2,481 of 553,105 true live frames (0.4%). Ball seen: 559 of 530,418
+  (0.1%). Ball missing: 1,922 of 22,687 (8.5%).
+- H/A predicted on true D: 1,043 of 449,539 frames (0.2%).
+- Visibility here is simulated blackout, so these rates may not transfer to the challenge
+  tracking.
 
 ### [pending] V5: Which decoder weights improve possession recovery?
 
@@ -262,13 +329,37 @@ three seeds. The observed target duration distribution does not reveal whether e
 or dead and is not labelled validation. Test a label-independent duration-matched scenario before
 drawing conclusions from the independent-gap experiment.
 
+A duration-matched stress test sampled the unlabelled challenge gap lengths and fixed the pooled
+missing share per simulated half. In J03WPY, with seeds 11 / 22 / 33, current-gap spellF1 was
+0.7085 / 0.6784 / 0.7021 and duration-matched spellF1 was 0.5411 / 0.5347 / 0.5630. The simulated
+median gaps were 11.48 / 11.00 / 10.84 s. The generator independently places gaps, shortens the
+last sampled gap if needed, and does not reproduce any relationship with live/dead phases or
+player visibility. The classifier was trained on the other six matches, but the fixed plain-decoder
+settings were historically chosen using all seven. This is one exploratory held-out match, not
+Y1 or an estimate of the challenge score. Experiment code is on `soda/missing-ball-robustness` at
+`c4ce758`; exact input and code hashes were recorded locally.
+
+A follow-up refitted the six-match classifier and used the Y1-selected J03WPY plain decoder
+(alpha 0, H/A cost 16, D cost 32), with settings chosen without J03WPY. Before testing changed
+gaps, the baseline decoded path, labels, halves, frames and visibility matched the saved Y1
+bundle exactly. This is baseline-path parity, not proof that probabilities under other masks are
+identical. The `oof-v3` release probabilities also decode to that saved path; Y1 did not record
+a hash proving which probability bytes it used. On seeds 11 / 22 / 33, current-gap spellF1 was
+0.7133 / 0.6911 / 0.6963 and duration-matched spellF1 was 0.5520 / 0.5407 / 0.5612. This is
+one previously examined outer match, not a seven-match nested estimate or challenge score. The
+simulated placements ignore live/dead state, and player loss remains label-conditioned. Run code
+was committed as `a3749f5`; input, artifact and source hashes were recorded locally.
+
 One provisional J03WPY retraining run used independent ball gaps during training. Its
 independent-gap scores were 0.6809 / 0.6516 / 0.6645, versus 0.6472 / 0.6249 / 0.6302 for the
 current training simulation. Its current-gap scores were 0.6909 / 0.6618 / 0.6951, versus 0.7085 /
 0.6784 / 0.7021. This is one match, one training seed, and a fixed historical decoder; it is not a
-merge decision. Seven-match clean nested comparisons and player-loss sensitivity remain pending. Y1 artifacts need the
-held-out predictions, matching visibility masks, run metadata, and confirmation that decoder settings
-were selected without the held-out match.
+merge decision. Seven-match clean nested comparisons and player-loss sensitivity remain pending.
+Y1 now supplies held-out predictions, matching visibility and provenance; its decoder settings
+exclude the outer match. Source inspection found an inner-selection dependency: for outer match m
+and inner validation match k, detector-training features for another match j can come from a
+stage-1 model trained on k. Inner prior and boundary rate also include k. This may bias inner
+selection scores, but does not by itself put outer match m into training. Its effect is unmeasured.
 
 ### [pending] J2: Can player movement identify possession during ball gaps?
 
