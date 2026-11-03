@@ -296,6 +296,17 @@ settings were historically chosen using all seven. This is one exploratory held-
 Y1 or an estimate of the challenge score. Experiment code is on `soda/missing-ball-robustness` at
 `c4ce758`; exact input and code hashes were recorded locally.
 
+A follow-up refitted the six-match classifier and used the Y1-selected J03WPY plain decoder
+(alpha 0, H/A cost 16, D cost 32), with settings chosen without J03WPY. Before testing changed
+gaps, the baseline decoded path, labels, halves, frames and visibility matched the saved Y1
+bundle exactly. This is baseline-path parity, not proof that probabilities under other masks are
+identical. The `oof-v3` release probabilities also decode to that saved path; Y1 did not record
+a hash proving which probability bytes it used. On seeds 11 / 22 / 33, current-gap spellF1 was
+0.7133 / 0.6911 / 0.6963 and duration-matched spellF1 was 0.5520 / 0.5407 / 0.5612. This is
+one previously examined outer match, not a seven-match nested estimate or challenge score. The
+simulated placements ignore live/dead state, and player loss remains label-conditioned. Run code
+was committed as `a3749f5`; input, artifact and source hashes were recorded locally.
+
 One provisional J03WPY retraining run used independent ball gaps during training. Its
 independent-gap scores were 0.6809 / 0.6516 / 0.6645, versus 0.6472 / 0.6249 / 0.6302 for the
 current training simulation. Its current-gap scores were 0.6909 / 0.6618 / 0.6951, versus 0.7085 /
