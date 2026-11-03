@@ -8,19 +8,17 @@ here from two open sources and nothing else:
   (`is_detected` for the ball and every player).
 - IDSSE (kora/external.py): corrected tracking, the clean end of the range (positional smoothness).
 
-One rule for every quantity: measure it on **every frame of the two periods** of the external stream,
-camera cuts and replays included, because that is what automatic tracking delivers. SkillCorner has
-no alive/dead flag, so a frame with no possession owner stands in for a stoppage (it also includes
-loose balls). An earlier draft measured the ball only while the camera showed players, through a
-speed-band mixture with IDSSE's dead rate; that censors exactly the stoppage frames where the ball is
-lost (P(missing | dead) 0.14 vs 0.79 here). Both estimates were seen before this rule was chosen;
-RESEARCH.md Y5 records that.
+Two candidate rules, both on SkillCorner with a frame that has no possession owner standing in for a
+stoppage (SkillCorner has no alive/dead flag; this also includes loose balls): every frame of the two
+periods, camera cuts and replays included, or only frames where the camera shows a detected player
+(cuts dropped, the frames either side joined). The pre-registered check below chose camera on
+(RESEARCH.md Y5). Positional noise is always measured before any join, so a cut is never a jump.
 
 Each training copy draws a severity s ~ U(0, 1) and scales every process by it, from clean corrected
 tracking (s = 0) to SkillCorner automatic tracking (s = 1). Nothing here reads the challenge match.
 
-    python -m kora.missingness                    # every frame (the rule in use): models/degrade_external.json
-    python -m kora.missingness --frames camera    # candidate: frames with a detected player only
+    python -m kora.missingness                    # camera on (the rule in use): models/degrade_external.json
+    python -m kora.missingness --frames all       # candidate: every frame, models/degrade_external_all.json
     python -m kora.missingness --check            # pre-registered external-only choice between the two
 
 The check (RESEARCH.md Y5, pre-registered 2026-11-03): degrade the seven IDSSE matches at full severity
@@ -84,6 +82,7 @@ def measure_skillcorner(camera_only=False):
         for h in (1, 2):
             i = d["half"] == h
             P, B, L = d["players"][i], d["ball"][i], d["label"][i]
+            var.append(second_diff_var(P))          # before any join: a cut is a gap, not a position jump
             if camera_only:
                 on = np.isfinite(P[:, :, 0]).any(1)
                 P, B, L = P[on], B[on], L[on]
@@ -92,7 +91,6 @@ def measure_skillcorner(camera_only=False):
             known = L != skillcorner.UNKNOWN
             n["miss_owner"] += int((miss & known).sum()); n["owner"] += int(known.sum())
             n["miss_free"] += int((miss & ~known).sum()); n["free"] += int((~known).sum())
-            var.append(second_diff_var(P))
             for s, e in zip(*runs(miss)):
                 all_gaps.append((e - s) / SC_FPS)
                 if s > 0 and e < len(L) and known[s - 1] and known[e]:      # flanked by an owner: live play
@@ -132,7 +130,7 @@ def quantiles(x):
 
 CHECK_FEATURES = ("b_seen", "t_since", "t_until", "nH", "nA")      # plus every b_seen_* window
 CHECK_STEP = 25                                                     # one frame per second
-CANDIDATES = {"every frame": OUT, "camera on": OUT.with_name("degrade_external_camera.json")}
+CANDIDATES = {"every frame": OUT.with_name("degrade_external_all.json"), "camera on": OUT}
 
 
 def check_features(players, team, ball, half):
@@ -178,7 +176,7 @@ def check():
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--frames", choices=("all", "camera"), default="all")
+    parser.add_argument("--frames", choices=("all", "camera"), default="camera")
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
     if args.check:

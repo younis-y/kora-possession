@@ -31,17 +31,19 @@ comes from **external data** (`kora/missingness.py` -> `models/degrade_external.
 
 | process | measured on | how |
 |---|---|---|
-| P(ball missing \| dead), P(ball missing \| alive) | SkillCorner | every frame of both periods (camera cuts included); a frame with no possession owner stands in for a stoppage: 0.79 and 0.077 |
+| P(ball missing \| dead), P(ball missing \| alive) | SkillCorner | frames where the camera shows a detected player; a frame with no possession owner stands in for a stoppage: 0.23 and 0.015 |
 | live ball-gap lengths | SkillCorner | gaps flanked by a known possession on both sides |
 | blackout offsets inside a stoppage | SkillCorner | ball gaps inside runs with no possession owner |
 | player visible / lost stretches, close-ups | SkillCorner | `is_detected` per player; stoppages where fewer than half the usual players are detected |
 | positional noise | SkillCorner vs IDSSE | excess variance of the second difference of positions |
 
-Every quantity is measured on every frame of the external stream. A camera-on-only estimate of ball
-loss (0.14 in stoppages) was also computed and rejected because it drops the stoppage frames where
-tracking loses the ball. The organisers' documentation reports the challenge ball missing on 41% of
-graded frames; we knew that when choosing the rule, and the chosen external estimate's overall share
-is 40%. No parameter was fitted to the challenge.
+Two measurement rules were candidates: every frame of the external stream (cuts and replays
+included; ball missing on 40% of frames) and only frames where the camera shows a detected player
+(5.7%). The organisers' documentation reports the challenge ball missing on 41% of graded frames, and
+we knew that when the first rule was proposed, so the choice was made by a check pre-registered before
+it ran and using external data only: degrade the seven IDSSE matches with each candidate and train a
+classifier to tell their missingness features from real SkillCorner tracking. The camera-on rule was
+harder to tell apart (AUC 0.87 vs 0.96 over 7 folds) and is used. No parameter was fitted to the challenge.
 
 SkillCorner is broadcast tracking, so its missingness is heavier than a fixed tactical camera's. Each
 training copy therefore draws a severity s ~ U(0, 1) that scales every process, from clean IDSSE
