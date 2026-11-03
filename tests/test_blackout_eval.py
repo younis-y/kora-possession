@@ -69,6 +69,23 @@ class BlackoutEvaluationTests(unittest.TestCase):
         self.assertTrue((masked_x == 0).any())
         np.testing.assert_array_equal(masked_x[:600], masked_x[600:])
 
+    def test_mixed_training_masks_only_odd_copies(self):
+        data = {'players': np.zeros((600, 2, 2)), 'ball': np.ones((600, 2)),
+                'label': np.tile([0, 1, 2], 200), 'half': np.repeat([1, 2], 300),
+                'team': np.array([0, 1])}
+        def build_ball(p, t, b, h):
+            return pd.DataFrame({'visible': np.isfinite(b[:, 0]).astype(float)})
+        with patch('kora.blackout_eval.MATCHES', {'a': None, 'held': None}), \
+             patch('kora.blackout_eval.load', return_value=data), \
+             patch('kora.blackout_eval.TRAIN_COPIES', 2), \
+             patch('kora.blackout_eval.SUBSAMPLE', 1), \
+             patch('kora.blackout_eval.degrade', side_effect=lambda p, b, y, rng: (p, b)), \
+             patch('kora.blackout_eval.build', side_effect=build_ball), \
+             patch('kora.blackout_eval.mirror', side_effect=lambda p, t, b: (p, t, b)):
+            x, _ = training_data('held', 'mixed')
+        self.assertTrue((x[:1200] == 1).all())
+        self.assertTrue((x[1200:] == 0).any())
+
     def test_training_seed_is_repeatable_and_changes_blackout(self):
         data = {'players': np.zeros((600, 2, 2)), 'ball': np.ones((600, 2)),
                 'label': np.tile([0, 1, 2], 200), 'half': np.repeat([1, 2], 300),

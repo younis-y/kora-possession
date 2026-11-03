@@ -15,6 +15,7 @@ feature cache, submission or challenge data is written. Loading a missing source
 match can download and cache its tracking data.
 
 Independent training changes the ball mask but keeps label-conditioned player degradation.
+Mixed training uses the current mask on even copies and the independent mask on odd copies.
 The optional duration-matched scenario samples unlabeled challenge gap lengths and the pooled
 missing rate. Its placements ignore labels. The last sampled gap can be shortened; retained
 source gaps may increase the realized missing rate or join gaps.
@@ -50,6 +51,7 @@ CONDITION_NAMES = ('clean', 'clean_ball', 'current', 'independent', 'live', 'liv
                    'clean_players_shuffled_current', 'duration_matched',
                    'clean_players_duration_matched')
 DURATION_CONDITIONS = ('duration_matched', 'clean_players_duration_matched')
+TRAINING_CONDITIONS = ('current', 'independent', 'mixed')
 Y1_SUMMARY_SHA256 = '65203af20938c8824ddd0a7ea3707508864db02b0860ef1ff9d0d137f24f39ff'
 Y1_BUNDLE_SHA256 = 'd54d02b2dccf7b56f986747f913db88722286394d313155cdd81710fafa44535'
 
@@ -173,7 +175,7 @@ def scores(y, pred, half):
 
 
 def training_data(held_out, condition='current', training_seed=SEED):
-    if condition not in ('current', 'independent'):
+    if condition not in TRAINING_CONDITIONS:
         raise ValueError('unknown training condition')
     xs, ys = [], []
     for match in training_matches(held_out, MATCHES):
@@ -181,7 +183,7 @@ def training_data(held_out, condition='current', training_seed=SEED):
         rng = np.random.default_rng([training_seed, list(MATCHES).index(match)])
         for copy in range(TRAIN_COPIES):
             players, ball = degrade(data['players'], data['ball'], data['label'], rng)
-            if condition == 'independent':
+            if condition == 'independent' or (condition == 'mixed' and copy % 2):
                 mask = make_mask(data['label'], data['half'], 'independent',
                                  [training_seed, list(MATCHES).index(match), copy])
                 ball = apply_mask(data['ball'][:, :2], mask)
@@ -204,7 +206,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--held-out', choices=MATCHES, required=True)
     parser.add_argument('--seeds', nargs='+', type=int, default=[11, 22, 33])
-    parser.add_argument('--training-condition', choices=('current', 'independent'), default='current')
+    parser.add_argument('--training-condition', choices=TRAINING_CONDITIONS, default='current')
     parser.add_argument('--training-seed', type=int, default=SEED)
     parser.add_argument('--nested-plain', action='store_true',
                         help='use Y1 settings for a plain fold and require exact reference parity')
