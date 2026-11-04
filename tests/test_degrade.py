@@ -51,7 +51,7 @@ class DegradeTests(unittest.TestCase):
         _, ball, _ = match(n=20000)
         half = np.repeat([1, 2], 10000)
         ext = {"missing_share": 0.4, "gap_s_quantiles": [1.0, 3.0]}
-        with mock.patch.dict(dg.PARAMS, ext, clear=True):
+        with mock.patch.dict(dg.RANDOM_GAPS, ext, clear=True):
             b = dg.random_ball(ball, half, np.random.default_rng(3))
             again = dg.random_ball(ball, half, np.random.default_rng(3))
         np.testing.assert_array_equal(b, again)

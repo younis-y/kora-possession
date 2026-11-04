@@ -16,7 +16,10 @@ import numpy as np
 
 from .features import FPS
 
-PARAMS = json.loads((Path(__file__).resolve().parent.parent / "models" / "degrade_external.json").read_text())
+MODELS = Path(__file__).resolve().parent.parent / "models"
+PARAMS = json.loads((MODELS / "degrade_external.json").read_text())
+# J6 was registered on the every-frame estimate (40% missing); camera on (Y5) would leave it 5.7%.
+RANDOM_GAPS = json.loads((MODELS / "degrade_external_all.json").read_text())
 
 
 def stretches(mask):
@@ -33,14 +36,14 @@ def draw(quantiles, rng):
 
 def random_ball(ball_xyz, half, rng):
     """Ball hidden by external-length gaps placed without labels, up to the external missing share
-    of each half (RESEARCH.md J6). Overlaps are allowed, so the realised share is a little lower."""
+    of each half (RESEARCH.md J6), both from the every-frame estimate it was registered with. Overlaps are allowed, so the realised share is a little lower."""
     out = ball_xyz[:, :2].copy()
     for h in np.unique(half):
         idx = np.flatnonzero(half == h)
-        budget = PARAMS["missing_share"] * len(idx)
+        budget = RANDOM_GAPS["missing_share"] * len(idx)
         while budget > 0:
             start = idx[rng.integers(len(idx))]
-            length = max(int(draw(PARAMS["gap_s_quantiles"], rng) * FPS), 1)
+            length = max(int(draw(RANDOM_GAPS["gap_s_quantiles"], rng) * FPS), 1)
             out[start:min(start + length, idx[-1] + 1)] = np.nan
             budget -= length
     return out
