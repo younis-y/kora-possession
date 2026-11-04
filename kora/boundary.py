@@ -30,6 +30,7 @@ from .decode import decode_hsmm, log_duration
 from .external import MATCHES
 from .features import nanroll
 from .train import MODELS, SEED, copies, segments_of, spell_f1
+from .variant import detector
 
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 RAW = ["b_seen", "t_since", "t_until", "sp_med_c101", "b_out", "d_diff_c25", "b_turn", "b_dspeed", "b_speed",
@@ -57,12 +58,21 @@ def context(proba, raw):
     return pd.DataFrame({k: np.asarray(v, np.float32) for k, v in f.items()}).to_numpy()
 
 
-def target(y, half):
-    """0 no change nearby, 1 H<->A change within RADIUS frames, 2 alive<->dead change."""
+def target(y, half, ha_priority=False):
+    """0 no nearby change, 1 H<->A within RADIUS frames, 2 alive<->dead.
+
+    Class 2 wins overlaps unless ha_priority gives class 1 priority (V7).
+    Cross-half changes are excluded; windows are not clipped at half boundaries.
+    """
     t = np.zeros(len(y), np.int8)
+    handover = np.zeros(len(y), bool) if ha_priority else None
     for c in np.flatnonzero((y[1:] != y[:-1]) & (half[1:] == half[:-1])) + 1:
         k = 2 if 2 in (y[c], y[c - 1]) else 1
         t[max(c - RADIUS, 0):c + RADIUS + 1] = np.maximum(t[max(c - RADIUS, 0):c + RADIUS + 1], k)
+        if ha_priority and k == 1:
+            handover[max(c - RADIUS, 0):c + RADIUS + 1] = True
+    if ha_priority:
+        t[handover] = 1
     return t
 
 
@@ -81,6 +91,7 @@ def runs_of(y, half):
 
 def main():
     t0 = time.time()
+    detector_cfg = detector()
     oof = np.load(MODELS / "oof.npz")
     cfg = json.loads((MODELS / "decoder.json").read_text())
     prior = np.array(cfg["prior"])
@@ -91,14 +102,14 @@ def main():
 
     def xy(ms):
         return (np.concatenate([data[k][1][::2] for k in ms]),
-                np.concatenate([target(data[k][2], data[k][3])[::2] for k in ms]))
+                np.concatenate([target(data[k][2], data[k][3], **detector_cfg)[::2] for k in ms]))
 
     def fold(m):
         X, y = xy([k for k in MATCHES if k != m])
         return model().fit(X, y).predict_proba(data[m][1])[:, 1]
 
     change = dict(zip(MATCHES, Parallel(n_jobs=len(MATCHES))(delayed(fold)(m) for m in MATCHES)))
-    rate = float(np.mean([(target(data[m][2], data[m][3]) == 1).mean() for m in MATCHES]))
+    rate = float(np.mean([(target(data[m][2], data[m][3], **detector_cfg) == 1).mean() for m in MATCHES]))
     np.savez_compressed(MODELS / "change_oof.npz", **change)          # for kora.errors; not committed
     print(f"detector folds done ({time.time() - t0:.0f} s)", flush=True)
 

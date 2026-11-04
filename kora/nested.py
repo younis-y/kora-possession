@@ -34,11 +34,12 @@ from .decode import decode, decode_hsmm, log_duration
 from .external import MATCHES
 from .train import (FEATURE_VERSION, GRID_ALPHA, GRID_D, GRID_HA, MODELS, SEED, STAGE1_VERSION, SUBSAMPLE,
                     TRAIN_COPIES, copies, fit_classifier, segments_of)
-from .variant import CONFIG, NAME, VARIANTS, decoder
+from .variant import CONFIG, NAME, VARIANTS, decoder, detector as detector_config
 from .vendor import possession_metrics as pm
 
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 DECODER = decoder()
+DETECTOR_CFG = detector_config()
 PLAIN = [tuple(s) for s in DECODER["plain_grid"] or
          [(a, h, d) for a in GRID_ALPHA for h in GRID_HA for d in GRID_D]]
 HSMM = [tuple(s) for s in DECODER["hsmm_grid"] or GRID]
@@ -95,7 +96,7 @@ def main():
     raw = {m: data[m][1][0][RAW] for m in MATCHES}
     seen = {m: data[m][1][0]["b_seen"].to_numpy().astype(np.int8) for m in MATCHES}
     labels = {m: np.concatenate([lab[::SUBSAMPLE] for _, lab in data[m][0]]) for m in MATCHES}
-    tgt = {m: target(y[m], half[m]) for m in MATCHES}
+    tgt = {m: target(y[m], half[m], **DETECTOR_CFG) for m in MATCHES}
 
     # 1. stage-1 predictions: outer (kora.train folds) and inner (without m and k)
     outer = {m: stage1(data, {m}, m) for m in MATCHES}
@@ -163,6 +164,7 @@ def main():
                           "not challenge tracking.",
             "commit": commit, "dirty": dirty, "seed": SEED, "variant": NAME, "config": CONFIG,
             "feature_version": FEATURE_VERSION, "stage1_version": STAGE1_VERSION, "inner_wins": INNER_WINS, "decoder": DECODER,
+            "detector": DETECTOR_CFG,
             "train_copies": TRAIN_COPIES, "subsample": SUBSAMPLE}
     summary = {**meta, "spell_f1_mean": float(f1.mean()), "spell_f1_std": float(f1.std()),
                "spell_f1_plain_mean": float(np.mean([folds[m]["spell_f1_plain"] for m in MATCHES])),

@@ -29,6 +29,8 @@ VARIANTS = {
     "b0_w4": {"decoder": {"inner_wins": 4}},          # exploratory: HSMM kept on 4 of 6 inner wins (Y5)
     "touch": {"touch": True},                         # R1: touch and handover features
     "touch_bal": {"touch": True, "balance": 0.5},     # R2: R1 + possession-balanced sample weights
+    # RESEARCH.md V7 round 1: give handover detector targets priority over live/dead windows.
+    "v7_ha_priority": {"touch": True, "balance": 0.5, "detector": {"ha_priority": True}},
     # J6 on top of production (its registration: "if R1/R2 change PRODUCTION, the same switches go on top").
     # b0_rand keeps its registered name; it is production + eval_rand.
     "mixed": {"touch": True, "balance": 0.5, "mixed": True},          # odd training copies get label-free gaps
@@ -46,6 +48,7 @@ TRAIN_KEYS = ("balance",)
 # stage-1 caches. Grids are lists of tuples: plain (alpha, cost_ha, cost_d), hsmm (cost_ha, cost_d, w_dur,
 # beta); None means the default grids (kora.train GRID_*, kora.boundary GRID).
 DECODER = {"inner_wins": 5, "plain_grid": None, "hsmm_grid": None}
+DETECTOR = {"ha_priority": False}
 
 
 def _name():
@@ -86,3 +89,7 @@ def stage1_version(config=CONFIG):
 
 def decoder(config=CONFIG):
     return {**DECODER, **config.get("decoder", {})}
+
+
+def detector(config=CONFIG):
+    return {**DETECTOR, **config.get("detector", {})}
