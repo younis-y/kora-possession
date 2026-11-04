@@ -294,6 +294,125 @@ class ErrorChecks(unittest.TestCase):
         self.assertIn("| 0.3 | <1 | 2 | 1 | 1 | 0.500 | 1 | 1 | 0 | 1.000 |", text)
         self.assertIn("| 0.5 | <1 | 2 | 0 | 2 | 0.000 | 1 | 0 | 1 | 0.000 |", text)
 
+    def assert_spell_causes(self, half, side, expected):
+        counts = {cause: dict.fromkeys(errors.SPELL_ERROR_GROUPS, 0)
+                  for cause in errors.SPELL_ERROR_CAUSES[side]}
+        for cause, group, count in expected:
+            counts[cause][group] = count
+        self.assertEqual(half["spell_errors"][side], counts)
+
+    def test_spell_error_each_cause_symmetric(self):
+        cases = (("H" * 10, "A" * 10),
+                 ("D" * 10 + "H" * 10 + "D" * 10, "A" * 30),
+                 ("H" * 10, "D" * 10),
+                 ("H" * 10, "HHDDHHDDHH"),
+                 ("H" * 9, "HHHAAADDD"))
+        for k, (truth, pred) in enumerate(cases):
+            for flip in (False, True):
+                if flip:
+                    truth, pred = (s.translate(str.maketrans("HA", "AH")) for s in (truth, pred))
+                for side, y, p in (("missed", truth, pred), ("invented", pred, truth)):
+                    with self.subTest(cause=k, flip=flip, side=side):
+                        h = self.analyse(y, p)["halves"][0]
+                        cause = errors.SPELL_ERROR_CAUSES[side][k]
+                        self.assert_spell_causes(h, side, [(cause, "<1", 1)])
+
+    def test_spell_error_first_applicable_rule(self):
+        cases = (("H" * 10, "A" * 5 + "D" * 5, 0),  # IoU exactly 0.5; also 50% other and D.
+                 ("D" * 10 + "H" * 10 + "D" * 10, "A" * 15 + "D" * 15, 1),
+                 ("H" * 10, "HHDDDDDHHH", 2))  # 50% D and 50% same team, no IoU match.
+        for truth, pred, k in cases:
+            for side, y, p in (("missed", truth, pred), ("invented", pred, truth)):
+                with self.subTest(cause=k, side=side):
+                    h = self.analyse(y, p)["halves"][0]
+                    self.assert_spell_causes(h, side, [(errors.SPELL_ERROR_CAUSES[side][k], "<1", 1)])
+
+    def test_spell_error_duration_edges_and_independent_groups(self):
+        lengths = (24, 25, 49, 50, 99, 100, 101)
+        truth = "D".join("H" * n for n in lengths)
+        pred = "D".join("A" * n for n in lengths)
+        h = self.analyse(truth, pred)["halves"][0]
+        for side in errors.SPELL_ERROR_CAUSES:
+            self.assert_spell_causes(h, side, [("team swap", group, count)
+                                              for group, count in zip(errors.SPELL_ERROR_GROUPS, (1, 2, 2, 2))])
+        h = self.analyse("H" * 24 + "D" * 6, "A" * 30)["halves"][0]
+        self.assert_spell_causes(h, "missed", [("team swap", "<1", 1)])
+        self.assert_spell_causes(h, "invented", [("team swap", "1–2", 1)])
+
+    def test_spell_error_half_isolation(self):
+        halves = [1] * 10 + [2] * 20
+        first, second = self.analyse("H" * 10 + "D" * 20, "A" * 30, halves)["halves"]
+        for side in errors.SPELL_ERROR_CAUSES:
+            self.assert_spell_causes(first, side, [("team swap", "<1", 1)])
+        self.assert_spell_causes(second, "missed", [])
+        self.assert_spell_causes(second, "invented", [("on dead ball", "<1", 1)])
+        first, second = self.analyse("A" * 30, "H" * 10 + "D" * 20, halves)["halves"]
+        for side in errors.SPELL_ERROR_CAUSES:
+            self.assert_spell_causes(first, side, [("team swap", "<1", 1)])
+        self.assert_spell_causes(second, "missed", [("dead ball instead", "<1", 1)])
+        self.assert_spell_causes(second, "invented", [])
+
+    def test_spell_error_filled_x(self):
+        h = self.analyse("H" * 10, "XXXXXAXXXX")["halves"][0]
+        for side in errors.SPELL_ERROR_CAUSES:
+            self.assert_spell_causes(h, side, [("team swap", "<1", 1)])
+        h = self.analyse("H" * 10, "HHXXDDHXXX")["halves"][0]
+        self.assert_spell_causes(h, "missed", [("same team, boundaries off", "<1", 1)])
+        self.assert_spell_causes(h, "invented", [("same team, boundaries off", "<1", 2)])
+        first, second = self.analyse("H" * 10 + "D" * 10, "X" * 10 + "A" * 10,
+                                     [1] * 10 + [2] * 10)["halves"]
+        self.assert_spell_causes(first, "missed", [("mixed", "<1", 1)])
+        self.assert_spell_causes(first, "invented", [])
+        self.assert_spell_causes(second, "missed", [])
+        self.assert_spell_causes(second, "invented", [("on dead ball", "<1", 1)])
+
+    def test_spell_error_swap_candidate_can_be_officially_matched(self):
+        for truth, pred, side in (("H" * 10 + "A" * 10, "H" * 20, "missed"),
+                                   ("H" * 20, "H" * 10 + "A" * 10, "invented")):
+            with self.subTest(side=side):
+                h = self.analyse(truth, pred)["halves"][0]
+                self.assertEqual(h["matches"][0.5], [(0, 0, 0.5)])
+                self.assert_spell_causes(h, side, [("team swap", "<1", 1)])
+                self.assert_spell_causes(h, "invented" if side == "missed" else "missed", [])
+
+    def test_spell_error_totals_equal_official(self):
+        cases = (("HHHHDDHHHH", "H" * 10), ("H" * 10, "HHHHDDHHHH"),
+                 ("H" * 10 + "A" * 10, "H" * 20), ("H" * 9, "HHHAAADDD"),
+                 ("H" * 10 + "D" * 10, "X" * 10 + "A" * 10), ("D" * 20, "D" * 20))
+        for truth, pred in cases:
+            halves = [1] * 10 + [2] * 10 if len(truth) == 20 else [1] * len(truth)
+            result = self.analyse(truth, pred, halves)
+            filled = pm.fill_abstentions(codes(pred), result["runs"])
+            for h, run in zip(result["halves"], result["runs"]):
+                official = pm.spell_scores(codes(truth), filled, [run])["per_iou"][0.5]
+                for side, key in (("missed", "n_missed"), ("invented", "n_spurious")):
+                    self.assertEqual(sum(sum(row.values()) for row in h["spell_errors"][side].values()),
+                                     official[key])
+
+    def test_spell_error_report_pools_cached_counts_and_empty_shares(self):
+        results = [("S", self.analyse("H" * 10, "A" * 10)),
+                   ("T", self.analyse("H" * 10 + "D" * 5 + "H" * 10 + "D" * 5 + "H" * 10, "D" * 40)),
+                   ("U", self.analyse("D" * 30, "H" * 30))]
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            errors._print_spell_error_report([{"spell_errors": h["spell_errors"]}
+                                              for _, result in results for h in result["halves"]])
+        text = output.getvalue()
+        self.assertIn("| Missed true cause | <1 s | 1–2 s | 2–4 s | 4+ s | Total | Share of all missed |", text)
+        self.assertIn("| Invented predicted cause | <1 s | 1–2 s | 2–4 s | 4+ s | Total | Share of all invented |", text)
+        self.assertIn("| team swap | 1 | 0 | 0 | 0 | 1 | 0.250 |", text)
+        self.assertIn("| dead ball instead | 3 | 0 | 0 | 0 | 3 | 0.750 |", text)
+        self.assertIn("| Total | 4 | 0 | 0 | 0 | 4 | 1.000 |", text)
+        self.assertIn("| team swap | 1 | 0 | 0 | 0 | 1 | 0.500 |", text)
+        self.assertIn("| on dead ball | 0 | 1 | 0 | 0 | 1 | 0.500 |", text)
+        self.assertIn("| Total | 1 | 1 | 0 | 0 | 2 | 1.000 |", text)
+        self.assertIn("Boundary errors may remain", text)
+        self.assertIn("Possession error causes at IoU 0.5", self.duration_output(results))
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            errors._print_spell_error_report([{"spell_errors": self.analyse("DD", "DD")["halves"][0]["spell_errors"]}])
+        self.assertEqual(output.getvalue().count("| Total | 0 | 0 | 0 | 0 | 0 | n/a |"), 2)
+
     def v4_case(self):
         # Six manually specified true-label/visibility strata, with all four predictions.
         strata = (("H", 1, "HHADDX"), ("H", 0, "HADDXXX"),
@@ -560,6 +679,63 @@ class ErrorChecks(unittest.TestCase):
         text = output.getvalue()
         self.assertIn("| 12 | H↔A | category subtotal | 0 | 0 | 0 | 0 | 0 | n/a | n/a |", text)
         self.assertIn("| outside all windows | 60 | 0 | 0.000 | n/a |", text)
+
+    def test_v3_missed_stoppage_split_and_pooling(self):
+        cases = (("H" * 60 + "D" * 60, "X" * 20 + "A" * 65 + "D" * 35, (1, 0, 0)),
+                 ("H" * 60 + "D" * 60, "H" * 86 + "D" * 34, (0, 1, 0)),
+                 ("H" * 40 + "D" * 5 + "H" * 5 + "D" * 50, "H" * 45 + "D" * 55, (0, 0, 1)),
+                 ("H" * 60 + "D" * 60, "H" * 60 + "D" * 60, (0, 0, 0)))
+        truth = "".join(y for y, _, _ in cases)
+        pred = "".join(p for _, p, _ in cases)
+        half = [i for i, (y, _, _) in enumerate(cases) for _ in y]
+        result = self.analyse(truth, pred, half)
+        for h, (_, _, counts) in zip(result["halves"], cases):
+            self.assertEqual(h["v3"]["missed_stoppages"], dict(zip(errors.STOPPAGE_MISS_CAUSES, counts)))
+            self.assertEqual(sum(h["v3"]["missed_stoppages"].values()),
+                             sum(h["v3"]["pairs"][25][key]["missed"]
+                                 for key in errors.TRANSITION_CATEGORIES["H/A→D"]))
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            errors._print_transition_report([{"v3": h["v3"]} for h in result["halves"]])
+        text = output.getvalue()
+        self.assertIn("| Missed true live→D cause (25 frames) | Count | Share of missed stoppages |", text)
+        for cause in errors.STOPPAGE_MISS_CAUSES:
+            self.assertIn(f"| {cause} | 1 | 0.333 |", text)
+        self.assertIn("| Total | 3 | 1.000 |", text)
+        self.assertIn("| Total | 3 | 1.000 |", self.transition_output([("S", result)]))
+
+    def test_v3_missed_stoppage_tolerance_edges(self):
+        for delta in (-26, -25, 0, 25, 26):
+            with self.subTest(delta=delta):
+                result = self.analyse("H" * 60 + "D" * 60, "A" * (60 + delta) + "D" * (60 - delta))
+                counts = (1, 0, 0) if abs(delta) <= 25 else (0, 1, 0)
+                self.assertEqual(result["halves"][0]["v3"]["missed_stoppages"],
+                                 dict(zip(errors.STOPPAGE_MISS_CAUSES, counts)))
+
+    def test_v3_missed_stoppage_half_isolation(self):
+        first, second = self.analyse("H" * 79 + "D" * 81, "A" * 81 + "D" * 79,
+                                     [1] * 80 + [2] * 80)["halves"]
+        self.assertEqual(first["v3"]["missed_stoppages"], dict(zip(errors.STOPPAGE_MISS_CAUSES, (0, 1, 0))))
+        self.assertEqual(second["v3"]["missed_stoppages"], dict.fromkeys(errors.STOPPAGE_MISS_CAUSES, 0))
+
+    def test_v3_missed_stoppage_priority_and_candidate_reuse(self):
+        truth = "H" * 40 + "D" * 5 + "H" * 5 + "D" * 50
+        cases = (("H" * 40 + "D" * 5 + "A" * 5 + "D" * 50, (1, 0, 0)),
+                 ("A" * 45 + "D" * 55, (2, 0, 0)))
+        for pred, counts in cases:
+            with self.subTest(counts=counts):
+                h = self.analyse(truth, pred)["halves"][0]
+                self.assertEqual(h["v3"]["missed_stoppages"], dict(zip(errors.STOPPAGE_MISS_CAUSES, counts)))
+
+    def test_v3_missed_stoppage_filled_and_all_x(self):
+        truth = "H" * 60 + "D" * 60
+        for pred, counts in (("H" * 30 + "X" * 30 + "D" * 60, (0, 0, 0)),
+                             ("A" * 30 + "X" * 30 + "D" * 60, (1, 0, 0)),
+                             ("X" * 120, (0, 1, 0))):
+            with self.subTest(counts=counts):
+                h = self.analyse(truth, pred)["halves"][0]
+                self.assertEqual(h["v3"]["missed_stoppages"], dict(zip(errors.STOPPAGE_MISS_CAUSES, counts)))
+        self.assertIn("| Total | 0 | n/a |", self.transition_output([("S", self.analyse(truth, truth))]))
 
     def test_validation(self):
         good = [codes("HHH"), codes("HHH"), np.ones(3, dtype=int), np.ones(3)]
