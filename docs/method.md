@@ -28,7 +28,7 @@ least 5 of the 7 matches improve.
 | SkillCorner open data | **used** | measurements of how automatic tracking loses the ball and players (section 4); no labels used |
 | Metrica sample data | dropped | two matched comparisons gave +0.54 and −0.61 points of gap-frame accuracy, and the data has no standard licence |
 | player-only model fused in ball gaps | dropped | the main model was already as accurate inside gaps (85.8% vs 84.4% team accuracy) |
-| wider decoder grid, boundary bonus on team changes only | dropped (reported, verification pending) | on B0: 0.7143 and 0.7146 vs 0.7147 (better on 0/7 and 1/7 matches), `RESEARCH.md` V5, V6 |
+| wider decoder grid, boundary bonus on team changes only | dropped | on B0: 0.7143 and 0.7146 vs 0.7147 (better on 0/7 and 1/7 matches). The wider grid chose B0's settings in 6 of 7 folds and the bonus change altered 51 frames, and neither candidate passed the registered keep rule on B0 (`RESEARCH.md` V5, V6) |
 | separate costs for entering and leaving dead ball | dropped before testing | stoppages and restarts alternate within a half: with the total cost, endpoint states and same-state continuation penalties fixed, changing the split between the two cannot change the preferred internal boundaries (`RESEARCH.md` V6) |
 
 ## 3. Training data (all from other games)
@@ -144,14 +144,13 @@ the duration prior and decoder selection, and scored once.
   (about 6% of the ball missing), while the challenge ball is missing on 41% of graded frames, so
   nested CV says little about long gaps. A separate stress test with label-free random gaps at the
   every-frame share is reported in `RESEARCH.md` J6.
-- **Where the errors are (B0, `RESEARCH.md` V1–V4).** The pipeline predicts 17% too few
-  possessions. Of the 1,047 true possessions missed at IoU 0.5, 524 (50%) are mostly covered by an
-  opposite-team prediction, most of them shorter than 2 s, 462 (44%) are mostly covered by a
-  same-team prediction with boundaries off, and 56 (5%) have a wrong-team prediction with IoU ≥ 0.5.
-  These are ordered diagnostic categories, not established causes. Team changes are recovered less
-  often than restarts (recall 0.55 against 0.97 within 1 s), and 211 of the 216 missed stoppages have
-  a predicted stoppage within 1 s with the wrong team just before it. These diagnostics are on B0. R2 improves recall of short possessions
-  (section 8).
+- **Where the errors are (R2, `RESEARCH.md` V1–V4).** R2 predicts 13.5% too few possessions. Of
+  the 891 true possessions missed at IoU 0.5, 426 (48%) are covered on at least half their frames by
+  opposite-team predictions, most of them shorter than 2 s, 411 (46%) by same-team predictions
+  despite failing IoU matching, and 51 (6%) have a wrong-team prediction with IoU ≥ 0.5. These are ordered
+  diagnostic categories, not established causes. Team changes are recovered less often than restarts
+  (recall 0.62 against 0.97 within 1 s), and 190 of the 195 missed stoppages have a predicted
+  stoppage within 1 s with the wrong team just before it.
 - **Boundary targets.** The change detector's training targets mark ±5 frames around each change,
   and live/dead targets overwrite overlapping team-change target frames. A label audit found this
   partly affects 41 of 2,351 team-change windows (1.7%), mostly just before stoppages, and erases
