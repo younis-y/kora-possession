@@ -555,7 +555,10 @@ gaps ignore the labels make the model less dependent on "ball missing means stop
   realised share is a little lower); both values from `models/degrade_external.json` (SkillCorner,
   external). Own seed per match and copy, so the B0 draws stay identical. J1 used 2 s geometric
   gaps instead; this run uses the external profile. (Amended before any code or run: first draft
-  named `kora.blackout.duration_matched_mask`, which is not on `main`.)
+  named `kora.blackout.duration_matched_mask`, which is not on `main`.) (Amended 2026-11-04, before
+  any J6 run: when Y5's check moved `degrade_external.json` to the camera-on estimate, the registered
+  values (every frame: 40% missing share and its gap lengths) moved to `degrade_external_all.json`;
+  `random_ball` now reads that file, so J6 runs with the values it was registered on.)
 - Random-gap test: `b0_rand` and `mixed_rand` are `b0` and `mixed` with the held-out (and inner)
   evaluation copy masked the same way. Decoder selection then also sees random gaps.
 - If R1/R2 change `PRODUCTION`, the same switches go on top of the new production variant.

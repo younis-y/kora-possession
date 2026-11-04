@@ -71,6 +71,8 @@ def feature_version(config=CONFIG):
     files = [ROOT / "kora" / "features.py", ROOT / "kora" / "degrade.py", ROOT / "models" / "degrade_external.json"]
     if config.get("touch"):
         files.append(ROOT / "kora" / "touch.py")
+    if config.get("mixed") or config.get("eval_rand"):
+        files.append(ROOT / "models" / "degrade_external_all.json")
     switches = json.dumps({k: config.get(k) for k in FEATURE_KEYS}, sort_keys=True)
     return "f" + _hash([f.read_bytes() for f in files] + [switches])
 
