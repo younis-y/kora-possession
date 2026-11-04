@@ -147,7 +147,11 @@ correction, so it is the `b0_w4` result: clean spellF1 **0.6889 ± 0.0224**, per
 it is a historical result, not comparable with B0. B0 (5 of 6, camera-on degradation) is a full rerun,
 and R1/R2 follow on the same degradation.
 
-**Outcome:** —
+**Outcome (2026-11-03, 20:18-22:14, commit e46b803, features fb1066a3834):** B0 = clean spellF1
+**0.7147 ± 0.0234** (plain 0.7046), per match 0.693 0.695 0.679 0.738 0.736 0.722 0.741
+(J03WPY, J03WN1, J03WMX, J03WOH, J03WQQ, J03WOY, J03WR9). This is the compliant baseline; release `nested-b0` holds the json and
+predictions. It is not comparable with Y1 (0.7169) or `b0_w4` (0.6889): each was graded on evaluation
+copies degraded differently.
 
 ### [pending] Y6: Do touch and handover features recover short possessions? (R1, R2)
 
