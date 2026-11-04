@@ -460,6 +460,34 @@ at all five IoUs.
   That needs the planned comparison on clean evaluation. Not yet audited: blurring by wide
   feature windows.
 
+
+**Pre-registration, round 1 (2026-11-05, before any outer run of this candidate).** Only the label
+audit above informed the design. No outer score of a V7 candidate exists.
+
+- Candidate `v7_ha_priority` in `kora/variant.py`: production `touch_bal` with
+  `detector.ha_priority`. A frame inside any H↔A ±5-frame window gets class 1 even when a live/dead
+  window also covers it. Radius, merged handover windows, and the unclipped half boundary are
+  unchanged. `rate` is recomputed from the new targets. Features and stage 1 are identical to
+  `touch_bal` (same feature and stage-1 versions), so stage-1 caches are reused. The 49 detector
+  fits and the full decoder selection rerun.
+- Base: `touch_bal`, run from the same commit and code state as the candidate. A `touch_bal` run
+  made on current code for J6 serves if its commit, configuration, and versions match. Record the
+  base name, resolved configuration, commit, and any uncommitted diff hash before running.
+- Run: `python -m kora.nested --variant v7_ha_priority`, then
+  `python -m kora.compare touch_bal v7_ha_priority`. Seed 2027.
+- Decision: keep if the unrounded mean spellF1 difference is positive and at least 5 of 7 matches
+  improve strictly. Ties are not wins. This is a selection rule, not a significance test. One
+  candidate in this round.
+- Pairing check before reading the result: seven matches in the same order, the same versions and
+  seed, and identical truth, half, frame, and visibility arrays in both bundles.
+- Secondary, reported but not deciding: H↔A and stoppage recall and precision at 12 and 25 frames,
+  missed stoppages split by cause, recall at IoU 0.5 for `<1` s and `1–2` s, the predicted-to-true
+  count ratio, `rate` for both variants, and plain or HSMM per fold.
+- Known limits: the audit found overwriting in 41 of 2,351 handover windows, 0.7% of handover-target
+  frames, so a small effect is expected. A changed `rate` rescales the boundary bonus and can change
+  decoder selection, so a difference is not attributable to the recovered frames alone.
+- Deployment: `kora.boundary` reads the same switch for final fitting. A kept result becomes
+  production through `PRODUCTION` and a rebuild.
 ## José — missing-ball robustness and extra data
 
 ### [verified] J1: Does the score depend on one blackout simulation?
