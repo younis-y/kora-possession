@@ -29,14 +29,16 @@ VARIANTS = {
     "b0_w4": {"decoder": {"inner_wins": 4}},          # exploratory: HSMM kept on 4 of 6 inner wins (Y5)
     "touch": {"touch": True},                         # R1: touch and handover features
     "touch_bal": {"touch": True, "balance": 0.5},     # R2: R1 + possession-balanced sample weights
-    "mixed": {"mixed": True},                         # J6: odd training copies get label-free ball gaps
-    "b0_rand": {"eval_rand": True},                   # J6 random-gap test: evaluation copies get them too
-    "mixed_rand": {"mixed": True, "eval_rand": True},
+    # J6 on top of production (its registration: "if R1/R2 change PRODUCTION, the same switches go on top").
+    # b0_rand keeps its registered name; it is production + eval_rand.
+    "mixed": {"touch": True, "balance": 0.5, "mixed": True},          # odd training copies get label-free gaps
+    "b0_rand": {"touch": True, "balance": 0.5, "eval_rand": True},    # random-gap test: evaluation copies too
+    "mixed_rand": {"touch": True, "balance": 0.5, "mixed": True, "eval_rand": True},
     "v5_wide": {"decoder": {"hsmm_grid": V5_HSMM_GRID}},
     # RESEARCH.md V6 round 1: B0 settings with handover-only boundary bonuses.
     "v6_ha_only": {"decoder": {"hsmm_grid": [s + (True,) for s in V5_HSMM_GRID[:54]]}},
 }
-PRODUCTION = "b0"
+PRODUCTION = "touch_bal"                              # Y6: R2 passed against B0 and R1
 FEATURE_KEYS = ("touch", "mixed", "eval_rand")
 TRAIN_KEYS = ("balance",)
 

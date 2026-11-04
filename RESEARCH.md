@@ -153,7 +153,7 @@ and R1/R2 follow on the same degradation.
 predictions. It is not comparable with Y1 (0.7169) or `b0_w4` (0.6889): each was graded on evaluation
 copies degraded differently.
 
-### [pending] Y6: Do touch and handover features recover short possessions? (R1, R2)
+### [verified] Y6: Do touch and handover features recover short possessions? (R1, R2)
 
 **Hypothesis:** oracle headroom on Y1 predictions (`notes/2026-11-03-headroom.py`): inserting missed
 possessions under 2 s is worth +0.129, far more than any other error type. Those possessions start
@@ -173,7 +173,20 @@ mean spellF1 is higher and at least 5 of 7 matches improve. R2 is compared with 
 it is kept only if it also passes against R1. Secondary, reported but not deciding: recall under
 2 s, count ratio, spellF1 per IoU.
 
-**Outcome:** —
+**Outcome (2026-11-04, commit e46b803 code, run from a checkout without PR #7):** both kept;
+`PRODUCTION` is now `touch_bal`.
+
+| variant | clean spellF1 | per match (J03WPY, J03WN1, J03WMX, J03WOH, J03WQQ, J03WOY, J03WR9) | vs B0 | vs R1 |
+| --- | ---: | --- | --- | --- |
+| B0 | 0.7147 ± 0.0234 | 0.693 0.695 0.679 0.738 0.736 0.722 0.741 | | |
+| R1 `touch` | 0.7432 ± 0.0325 | 0.742 0.743 0.696 0.786 0.739 0.708 0.789 | +0.0284, 6/7 | |
+| R2 `touch_bal` | 0.7528 ± 0.0279 | 0.752 0.744 0.703 0.775 0.744 0.751 0.801 | +0.0381, 7/7 | +0.0097, 6/7 |
+
+Secondary: recall at IoU 0.5 for true possessions under 1 s 0.208 (B0), 0.271 (R1), 0.268 (R2);
+1-2 s 0.439, 0.514, 0.538; count ratio 0.834, 0.858, 0.870; spellF1 at IoU 0.7 0.611, 0.644, 0.662.
+Following J6's registration, `mixed`, `b0_rand` and `mixed_rand` now sit on top of `touch_bal`, and
+J6 rule 2 reads `python -m kora.compare touch_bal mixed`. The committed submission was built with B0
+and must be rebuilt with `build.sh` before the freeze.
 
 ## Vladymyr — error metrics and decoder
 
@@ -566,7 +579,8 @@ gaps ignore the labels make the model less dependent on "ball missing means stop
 **Decision rule (agreed with Younis):** keep `mixed` if both hold:
 
 1. `python -m kora.compare b0_rand mixed_rand`: better on at least 5 of 7 matches.
-2. `python -m kora.compare b0 mixed`: mean spellF1 drops by no more than 0.01.
+2. `python -m kora.compare b0 mixed`: mean spellF1 drops by no more than 0.01. (After Y6 set
+   `PRODUCTION = touch_bal`, this reads `compare touch_bal mixed`; see Y6.)
 
 Secondary, reported but not deciding: means, short-possession recall, count ratio.
 
