@@ -173,7 +173,7 @@ it is kept only if it also passes against R1. Secondary, reported but not decidi
 
 ## Vladymyr ([research/vladymyr-decoder](https://github.com/younis-y/kora-possession/tree/research/vladymyr-decoder)) — error metrics and decoder
 
-### [pending] V1: Are possessions merged, split, or miscounted?
+### [verified] V1: Are possessions merged, split, or miscounted?
 
 **Hypothesis:** Merges and splits can cancel in total counts. Approximate matching can undercount
 false predictions.
@@ -186,7 +186,7 @@ false predictions.
 - Count merges and splits from interval overlaps under a declared rule. Separate wrong-team
   fragments, false D interruptions, and complex cases.
 
-**Outcome:** Metric implemented in `kora/errors.py`. Empirical result pending.
+**Outcome:** Metric implemented in `kora/errors.py`. Result on B0 below.
 
 - Input contract: `analyse(y_true, y_pred, half, ball_seen, fps=25)` on frame-aligned codes
   (0 H, 1 A, 2 D, 3 X). Each half is one contiguous block, and all spell and transition work
@@ -213,17 +213,22 @@ false predictions.
   many-to-many, weak overlaps, erased opposite possessions, adjacent halves, X handling,
   normalisation, and bundle validation.
 
-**Provisional result on Y1 predictions** (`nested-v1` release, SHA-256 `d54d02b2…`, which reproduces spellF1 0.7169 ± 0.0304). Y1's degradation values were measured on the challenge tracking, which the organisers' 3 Nov rules do not allow for training. These figures are a pipeline check until the B0 bundle is available.
+**Result on B0 predictions** (`nested-b0` release, SHA-256 `9efc7fbe…`, which reproduces spellF1
+0.7147 ± 0.0234). B0 is the compliant baseline (Y5). These are descriptive diagnostics on the seven
+external matches. They replace the provisional Y1 figures recorded earlier.
 
-- 3,061 true and 2,445 predicted possessions over the seven matches, 20% too few (206 against
-  165 per 45 minutes).
-- At IoU 0.5, 2,000 are matched, 1,061 true spells are missed, and 445 predicted spells are
+- 3,061 true and 2,538 predicted possessions, 17% too few (206 against 171 per 45 minutes).
+- At IoU 0.5, 2,014 are matched, 1,047 true spells are missed, and 524 predicted spells are
   unmatched.
-- Under the declared association rule, 226 merge components cover 481 true spells, all with
-  opposite-team gaps, versus 42 split components, all with wrong-team gaps. No split component
-  has a false D gap. Another 534 true spells have no retained same-team overlap.
+- Under the declared association rule, 211 merge components cover 448 true spells, all with
+  opposite-team gaps, versus 47 split components, 46 with wrong-team gaps and 1 with a false D gap.
+  Another 502 true spells and 166 predicted spells have no retained same-team overlap.
+- The shortfall of 523 decomposes exactly under the association rule: merges contribute 237 (448
+  true spells in 211 predictions), isolated true spells exceed isolated predicted spells by 336 (502
+  against 166), and splits offset the shortfall by 50 (47 true spells in 97 predictions). The 1:1
+  and complex components each have equal true and predicted counts.
 
-### [pending] V2: Are short possessions missing or mistimed?
+### [verified] V2: Are short possessions missing or mistimed?
 
 **Hypothesis:** IoU 0.5 alone hides the difference between missed possessions and inaccurate boundaries.
 
@@ -232,25 +237,25 @@ false predictions.
 precision, and false predicted spells by duration. Recheck the reported one-fifth recall below
 one second on clean predictions.
 
-**Outcome:** Metric implemented in `kora/errors.py`. Empirical result pending.
+**Outcome:** Metric implemented in `kora/errors.py`. Result on B0 below.
 
 - Spells are matched per half at each IoU before grouping. Recall uses true duration groups.
   Precision and false predicted spells use predicted duration groups, so one pair can fall in
   different groups on each side. Counts are pooled, and ratios with a zero denominator print `n/a`.
 - Checks: group edges, cross-group pairs, empty groups, totals against the official scorer,
   and extra fragments lowering precision without changing recall.
-- The one-fifth recall below one second still needs clean predictions.
 
-**Provisional result on Y1 predictions** (`nested-v1` release, SHA-256 `d54d02b2…`, which reproduces spellF1 0.7169 ± 0.0304). Y1's degradation values were measured on the challenge tracking, which the organisers' 3 Nov rules do not allow for training. These figures are a pipeline check until the B0 bundle is available.
+**Result on B0 predictions** (`nested-b0` release, SHA-256 `9efc7fbe…`, which reproduces spellF1
+0.7147 ± 0.0234). B0 is the compliant baseline (Y5). These are descriptive diagnostics on the seven
+external matches. They replace the provisional Y1 figures recorded earlier.
 
-- Recall at IoU 0.5 by true duration: `<1` s 0.180 (384 spells), `1–2` s 0.445 (535), `2–4` s
-  0.623 (702), `4–8` s 0.785 (620), `8–15` s 0.900 (438), `15+` s 0.982 (382). The one-fifth
-  recall below one second holds on these predictions.
-- Precision at IoU 0.5 by predicted duration: `<1` s 0.638 (130 spells), `1–2` s 0.645 (330),
-  `15+` s 0.959 (413). Short possessions are mostly missed rather than invented: 130 predicted
-  below one second against 384 true.
+- Recall at IoU 0.5 by true duration: `<1` s 0.208 (384 spells), `1–2` s 0.439 (535), `2–4` s
+  0.642 (702), `4–8` s 0.769 (620), `8–15` s 0.909 (438), `15+` s 0.976 (382). About one fifth of
+  possessions under one second are recovered.
+- Precision at IoU 0.5 by predicted duration: `<1` s 0.524 (166 spells), `1–2` s 0.611 (360),
+  `15+` s 0.957 (419). 166 spells are predicted below one second against 384 true.
 
-### [pending] V3: Which transition types fail, and by how much?
+### [verified] V3: Which transition types fail, and by how much?
 
 **Hypothesis:** The reported 68% of wrong frames near transitions mixes handovers, stoppages, and restarts.
 
@@ -259,7 +264,7 @@ recall, early/late bias, and median/p90 absolute timing errors. Match exact tran
 within each half at the official tolerances. Report errors within one second of each type,
 their share of all wrong frames, and overlapping windows.
 
-**Outcome:** Metric implemented in `kora/errors.py`. Empirical result pending.
+**Outcome:** Metric implemented in `kora/errors.py`. Result on B0 below.
 
 - Transitions are matched per half by exact (from, to) pair at 12 and 25 frames. Results are
   grouped as H↔A, H/A→D, and D→H/A, with the six pairs as a breakdown. Latency is predicted
@@ -274,30 +279,31 @@ their share of all wrong frames, and overlapping windows.
 - Checks: timing offsets at both tolerances, type confusion, transitions across adjacent
   halves, both ambiguity cases, window overlap and clipping, and pooled quantiles.
 
-**Provisional result on Y1 predictions** (`nested-v1` release, SHA-256 `d54d02b2…`, which reproduces spellF1 0.7169 ± 0.0304). Y1's degradation values were measured on the challenge tracking, which the organisers' 3 Nov rules do not allow for training. These figures are a pipeline check until the B0 bundle is available.
+**Result on B0 predictions** (`nested-b0` release, SHA-256 `9efc7fbe…`, which reproduces spellF1
+0.7147 ± 0.0234). B0 is the compliant baseline (Y5). These are descriptive diagnostics on the seven
+external matches. They replace the provisional Y1 figures recorded earlier.
 
-- At 25 frames: H↔A recall 0.531 and precision 0.720 (2,351 true, 1,734 predicted). H/A→D 0.669
-  and 0.669 (710 and 710). D→H/A 0.966 and 0.967 (699 and 698).
-- Among handovers matched within 25 frames, median absolute error is 2 frames, p90 is 15 frames,
-  and mean signed error is −0.4 frames. These statistics describe only matched events.
-- Of 235 stoppages missed under exact pairs at tolerance 25 frames, 216 have a predicted
-  stoppage within 1 s whose preceding team is wrong. This identifies a preceding-team mismatch
-  near the stoppage. The V7 audit separately found 36 of 41 affected handover targets just
-  before stoppages. The relationship between these findings remains untested.
-- Wrong frames: 58% lie within 1 s of a handover, 14% within 1 s of a stoppage, and 2% within
-  1 s of a restart (inclusive rows). 68% lie in any window, which reproduces the earlier figure.
-  32% lie outside all windows.
-- Restart timing (p90 1 frame) may be flattered by the simulated blackouts, which are placed
-  mostly in dead ball.
+- At 25 frames: H↔A recall 0.549 and precision 0.706 (2,351 true, 1,829 predicted). H/A→D recall
+  0.696 and precision 0.698 (710 and 708). D→H/A recall 0.967 and precision 0.971 (699 and 696).
+- Among handovers matched within 25 frames, median absolute error is 2 frames, p90 is 16 frames,
+  and mean signed error is −0.3 frames. These statistics describe only matched events. One true and
+  13 predicted handovers had more than one feasible partner.
+- Of 216 stoppages missed under exact pairs at tolerance 25 frames, 211 have a predicted stoppage
+  within 1 s whose preceding team is wrong. This identifies a preceding-team mismatch near the
+  stoppage.
+- Wrong frames: 58.6% lie within 1 s of a handover, 11.7% within 1 s of a stoppage, and 2.1%
+  within 1 s of a restart (inclusive rows). 66.7% lie in any window and 33.3% outside all windows.
+- Restart timing (p90 1 frame) may be flattered by the simulated degradation, which still hides the
+  ball more often in dead ball than in play.
 
-### [pending] V4: How often is D predicted during live play?
+### [verified] V4: How often is D predicted during live play?
 
 **Hypothesis:** The reported 2% of errors on true dead ball excludes false D during possession.
 
 **Experiment:** Report `false D frames / true live-play frames`, split by H/A and ball visibility.
 Measure the reverse error: H/A predicted on true D. Include numerators and denominators.
 
-**Outcome:** Metric implemented in `kora/errors.py`. Empirical result pending.
+**Outcome:** Metric implemented in `kora/errors.py`. Result on B0 below.
 
 - A per-half count matrix `[true H/A/D, ball visibility, raw prediction H/A/D/X]` gives
   `false D / true live` by team and visibility, and `predicted H/A / true D` by visibility.
@@ -307,12 +313,15 @@ Measure the reverse error: H/A predicted on true D. Include numerators and denom
 - Checks: hand-computed rows, X on live frames, zero denominators, and agreement with
   `pm.confusion`.
 
-**Provisional result on Y1 predictions** (`nested-v1` release, SHA-256 `d54d02b2…`, which reproduces spellF1 0.7169 ± 0.0304). Y1's degradation values were measured on the challenge tracking, which the organisers' 3 Nov rules do not allow for training. These figures are a pipeline check until the B0 bundle is available.
+**Result on B0 predictions** (`nested-b0` release, SHA-256 `9efc7fbe…`, which reproduces spellF1
+0.7147 ± 0.0234). B0 is the compliant baseline (Y5). These are descriptive diagnostics on the seven
+external matches. They replace the provisional Y1 figures recorded earlier.
 
-- False D during live play: 2,481 of 553,105 true live frames (0.4%). Ball seen: 559 of 530,418
-  (0.1%). Ball missing: 1,922 of 22,687 (8.5%).
-- H/A predicted on true D: 1,043 of 449,539 frames (0.2%).
-- Visibility here is simulated blackout, so these rates may not transfer to the challenge
+- False D during live play: 761 of 553,105 true live frames (0.14%). Ball seen: 687 of 550,026
+  (0.12%). Ball missing: 74 of 3,079 (2.4%).
+- H/A predicted on true D: 568 of 449,539 frames (0.13%).
+- The ball is missing on 3.9% of frames in B0's evaluation copies, so the missing-ball rows rest on
+  few live frames. Visibility here is simulated, so these rates may not transfer to the challenge
   tracking.
 
 ### [pending] V5: Which decoder weights improve possession recovery?
