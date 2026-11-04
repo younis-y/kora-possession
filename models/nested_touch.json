@@ -1,0 +1,331 @@
+{
+  "schema": 1,
+  "fps": 25,
+  "matches": [
+    "J03WPY",
+    "J03WN1",
+    "J03WMX",
+    "J03WOH",
+    "J03WQQ",
+    "J03WOY",
+    "J03WR9"
+  ],
+  "provenance": "kora.nested: each held-out match excluded from stage 1, the detector, the prior, the rate, the duration prior and decoder selection; scored once. Ball and player gaps are simulated from external measurements (kora/degrade.py), not challenge tracking.",
+  "commit": "f661408db206f6fccc1c922691aef19c8bc3461e",
+  "dirty": false,
+  "seed": 2027,
+  "variant": "touch",
+  "config": {
+    "touch": true
+  },
+  "feature_version": "fee529f5bd9",
+  "stage1_version": "fee529f5bd9s364d06d335",
+  "inner_wins": 5,
+  "decoder": {
+    "inner_wins": 5,
+    "plain_grid": null,
+    "hsmm_grid": null
+  },
+  "train_copies": 2,
+  "subsample": 6,
+  "spell_f1_mean": 0.7431572352233383,
+  "spell_f1_std": 0.03249995878059955,
+  "spell_f1_plain_mean": 0.7400271251661292,
+  "spell_f1_hsmm_mean": 0.7498971251215868,
+  "folds": {
+    "J03WPY": {
+      "inner_matches": [
+        "J03WN1",
+        "J03WMX",
+        "J03WOH",
+        "J03WQQ",
+        "J03WOY",
+        "J03WR9"
+      ],
+      "decoder": "hsmm",
+      "plain": {
+        "alpha": 0.0,
+        "cost_ha": 8,
+        "cost_d": 64,
+        "inner_mean": 0.7407950303923401
+      },
+      "hsmm": {
+        "cost_ha": 8,
+        "cost_d": 8,
+        "w_dur": 2,
+        "beta": 4,
+        "inner_mean": 0.746477781040145,
+        "rate": 0.02536110238504319
+      },
+      "prior": [
+        0.27531683258489154,
+        0.27531683258489154,
+        0.449366334830217
+      ],
+      "spell_f1": 0.7415265200517465,
+      "spell_f1_per_iou": {
+        "0.3": 0.8201811125485122,
+        "0.4": 0.7865459249676585,
+        "0.5": 0.7503234152652005,
+        "0.6": 0.6959896507115135,
+        "0.7": 0.6545924967658473
+      },
+      "n_true": 421,
+      "n_pred": 352,
+      "spell_f1_plain": 0.7329842931937173,
+      "spell_f1_hsmm": 0.7415265200517465
+    },
+    "J03WN1": {
+      "inner_matches": [
+        "J03WPY",
+        "J03WMX",
+        "J03WOH",
+        "J03WQQ",
+        "J03WOY",
+        "J03WR9"
+      ],
+      "decoder": "hsmm",
+      "plain": {
+        "alpha": 0.0,
+        "cost_ha": 8,
+        "cost_d": 32,
+        "inner_mean": 0.7372761994717179
+      },
+      "hsmm": {
+        "cost_ha": 8,
+        "cost_d": 8,
+        "w_dur": 2,
+        "beta": 4,
+        "inner_mean": 0.7416503584437514,
+        "rate": 0.024345902436094056
+      },
+      "prior": [
+        0.2814494551130188,
+        0.2814494551130188,
+        0.4371010897739625
+      ],
+      "spell_f1": 0.7426067907995619,
+      "spell_f1_per_iou": {
+        "0.3": 0.8214676889375686,
+        "0.4": 0.8017524644030667,
+        "0.5": 0.7557502738225629,
+        "0.6": 0.6944140197152245,
+        "0.7": 0.6396495071193867
+      },
+      "n_true": 500,
+      "n_pred": 413,
+      "spell_f1_plain": 0.7250836120401338,
+      "spell_f1_hsmm": 0.7426067907995619
+    },
+    "J03WMX": {
+      "inner_matches": [
+        "J03WPY",
+        "J03WN1",
+        "J03WOH",
+        "J03WQQ",
+        "J03WOY",
+        "J03WR9"
+      ],
+      "decoder": "plain",
+      "plain": {
+        "alpha": 1.0,
+        "cost_ha": 8,
+        "cost_d": 32,
+        "inner_mean": 0.7480592321106635
+      },
+      "hsmm": {
+        "cost_ha": 2,
+        "cost_d": 16,
+        "w_dur": 4,
+        "beta": 4,
+        "inner_mean": 0.7553627985556176,
+        "rate": 0.024309798472450992
+      },
+      "prior": [
+        0.273003599893544,
+        0.273003599893544,
+        0.453992800212912
+      ],
+      "spell_f1": 0.6959821428571429,
+      "spell_f1_per_iou": {
+        "0.3": 0.78125,
+        "0.4": 0.7589285714285714,
+        "0.5": 0.7209821428571429,
+        "0.6": 0.6428571428571428,
+        "0.7": 0.5758928571428572
+      },
+      "n_true": 511,
+      "n_pred": 385,
+      "spell_f1_plain": 0.6959821428571429,
+      "spell_f1_hsmm": 0.7142222222222221
+    },
+    "J03WOH": {
+      "inner_matches": [
+        "J03WPY",
+        "J03WN1",
+        "J03WMX",
+        "J03WQQ",
+        "J03WOY",
+        "J03WR9"
+      ],
+      "decoder": "hsmm",
+      "plain": {
+        "alpha": 0.0,
+        "cost_ha": 8,
+        "cost_d": 16,
+        "inner_mean": 0.7340560432425932
+      },
+      "hsmm": {
+        "cost_ha": 2,
+        "cost_d": 8,
+        "w_dur": 4,
+        "beta": 4,
+        "inner_mean": 0.7428880982161834,
+        "rate": 0.025328996752386843
+      },
+      "prior": [
+        0.277972282499428,
+        0.277972282499428,
+        0.4440554350011439
+      ],
+      "spell_f1": 0.7860589812332439,
+      "spell_f1_per_iou": {
+        "0.3": 0.8659517426273459,
+        "0.4": 0.8364611260053619,
+        "0.5": 0.7908847184986595,
+        "0.6": 0.745308310991957,
+        "0.7": 0.6916890080428956
+      },
+      "n_true": 402,
+      "n_pred": 344,
+      "spell_f1_plain": 0.7829105473965288,
+      "spell_f1_hsmm": 0.7860589812332439
+    },
+    "J03WQQ": {
+      "inner_matches": [
+        "J03WPY",
+        "J03WN1",
+        "J03WMX",
+        "J03WOH",
+        "J03WOY",
+        "J03WR9"
+      ],
+      "decoder": "hsmm",
+      "plain": {
+        "alpha": 1.0,
+        "cost_ha": 8,
+        "cost_d": 32,
+        "inner_mean": 0.7416224383550789
+      },
+      "hsmm": {
+        "cost_ha": 8,
+        "cost_d": 16,
+        "w_dur": 2,
+        "beta": 4,
+        "inner_mean": 0.7509129364171864,
+        "rate": 0.025464311609917713
+      },
+      "prior": [
+        0.27240297102207345,
+        0.27240297102207345,
+        0.4551940579558531
+      ],
+      "spell_f1": 0.7394999999999999,
+      "spell_f1_per_iou": {
+        "0.3": 0.8225,
+        "0.4": 0.795,
+        "0.5": 0.7525,
+        "0.6": 0.695,
+        "0.7": 0.6325
+      },
+      "n_true": 401,
+      "n_pred": 399,
+      "spell_f1_plain": 0.7468030690537085,
+      "spell_f1_hsmm": 0.7394999999999999
+    },
+    "J03WOY": {
+      "inner_matches": [
+        "J03WPY",
+        "J03WN1",
+        "J03WMX",
+        "J03WOH",
+        "J03WQQ",
+        "J03WR9"
+      ],
+      "decoder": "plain",
+      "plain": {
+        "alpha": 0.0,
+        "cost_ha": 8,
+        "cost_d": 64,
+        "inner_mean": 0.7423969116132608
+      },
+      "hsmm": {
+        "cost_ha": 4,
+        "cost_d": 8,
+        "w_dur": 3,
+        "beta": 4,
+        "inner_mean": 0.7468399967917055,
+        "rate": 0.024925699465665318
+      },
+      "prior": [
+        0.27717398886672157,
+        0.27717398886672157,
+        0.4456520222665569
+      ],
+      "spell_f1": 0.7078384798099762,
+      "spell_f1_per_iou": {
+        "0.3": 0.7957244655581948,
+        "0.4": 0.7672209026128265,
+        "0.5": 0.7102137767220902,
+        "0.6": 0.660332541567696,
+        "0.7": 0.6057007125890737
+      },
+      "n_true": 456,
+      "n_pred": 386,
+      "spell_f1_plain": 0.7078384798099762,
+      "spell_f1_hsmm": 0.725943396226415
+    },
+    "J03WR9": {
+      "inner_matches": [
+        "J03WPY",
+        "J03WN1",
+        "J03WMX",
+        "J03WOH",
+        "J03WQQ",
+        "J03WOY"
+      ],
+      "decoder": "plain",
+      "plain": {
+        "alpha": 1.0,
+        "cost_ha": 8,
+        "cost_d": 32,
+        "inner_mean": 0.7357006486084435
+      },
+      "hsmm": {
+        "cost_ha": 8,
+        "cost_d": 16,
+        "w_dur": 2,
+        "beta": 4,
+        "inner_mean": 0.7389196780094117,
+        "rate": 0.025931087025074517
+      },
+      "prior": [
+        0.2733015051773333,
+        0.2733015051773333,
+        0.45339698964533337
+      ],
+      "spell_f1": 0.7885877318116975,
+      "spell_f1_per_iou": {
+        "0.3": 0.8530670470756063,
+        "0.4": 0.8245363766048501,
+        "0.5": 0.8017118402282454,
+        "0.6": 0.75320970042796,
+        "0.7": 0.7104136947218259
+      },
+      "n_true": 370,
+      "n_pred": 331,
+      "spell_f1_plain": 0.7885877318116975,
+      "spell_f1_hsmm": 0.799421965317919
+    }
+  }
+}
