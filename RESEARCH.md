@@ -245,6 +245,24 @@ external matches. They replace the provisional Y1 figures recorded earlier.
   against 166), and splits offset the shortfall by 50 (47 true spells in 97 predictions). The 1:1
   and complex components each have equal true and predicted counts.
 
+**Production check on `touch_bal`** (`nested-touch-bal` release, SHA-256 `9a9d20f2…`, spellF1
+0.7528). Descriptive, same seven external matches.
+
+- 3,061 true and 2,647 predicted possessions, 13.5% too few. The shortfall of 414 decomposes under the
+  association rule into merges 209 (395 true spells in 186 predictions), isolated true over isolated
+  predicted 253 (417 against 164), splits −49 (44 true spells in 93 predictions), and complex
+  components +1 (13 against 12).
+- At IoU 0.5, 2,170 are matched, 891 true spells are missed, and 477 predicted spells are unmatched.
+  Of the 891 missed, 426 (48%) are covered on at least half their frames by opposite-team
+  predictions, 411 (46%) by same-team predictions despite failing IoU matching, 51 (6%) have a
+  wrong-team prediction with IoU ≥ 0.5, and
+  3 are mostly predicted D. These ordered categories come from the cause split in PR #11 and do not
+  establish causes.
+- Recall at IoU 0.5: `<1` s 0.268, `1–2` s 0.538, `15+` s 0.982. At 25 frames, H↔A recall 0.618 and
+  precision 0.749, stoppages 0.725 and 0.728, restarts 0.967 and 0.973. Of 195 stoppages missed under
+  exact pairs, 190 have a predicted stoppage within 1 s with the wrong preceding team.
+- False D during live play: 505 of 553,105 frames. H/A predicted on true D: 388 of 449,539 frames.
+
 ### [verified] V2: Are short possessions missing or mistimed?
 
 **Hypothesis:** IoU 0.5 alone hides the difference between missed possessions and inaccurate boundaries.
@@ -341,7 +359,7 @@ external matches. They replace the provisional Y1 figures recorded earlier.
   few live frames. Visibility here is simulated, so these rates may not transfer to the challenge
   tracking.
 
-### [pending] V5: Which decoder weights improve possession recovery?
+### [dropped] V5: Which decoder weights improve possession recovery?
 
 **Hypothesis:** Inner selection sits on edges of the HSMM grid `cost_ha (2, 4, 8) × cost_d (8, 16) ×
 w_dur (2, 3, 4) × beta (2, 3, 4)`. Across the 14 folds of Y1 and `b0_w4`, under earlier degradation
@@ -383,9 +401,23 @@ inner-selected settings informed the design. No outer score of a V5 candidate ex
   needs a separate change before it reaches the submission.
 - Cost: 7,560 inner `decode_hsmm` calls against 2,268 for B0 (3.3×). Wall time is not yet measured.
 
-**Outcome:** —
+**Outcome:** Dropped under the registered rule. Run by Younis on B0 (`nested-touch-bal` release,
+SHA-256 `2567c74f…`).
 
-### [pending] V6: Should transition costs and boundary bonuses depend on direction?
+- Pairing check passed: the same seven matches in the same order, identical truth, half, frame, and
+  visibility arrays, seed 2027, and the same feature and stage-1 versions as B0. The bundles record
+  commits `e46b803` for B0 and `b15b72d` for V5 and V6. The commits also differ in decoder and
+  evaluation code.
+- spellF1 0.7143 against 0.7147, a mean difference of −0.0004. No match improves, one is worse
+  (J03WOH −0.0029), and six are exactly tied.
+- Inner selection kept the semi-Markov decoder in every fold and chose B0's own setting in six of
+  seven. Predictions differ from B0 on 192 frames, all in J03WOH. Chosen settings lay on an edge of
+  the new grid for cost_ha in 4 folds, cost_d in 6, w_dur in 5, and beta in none. As registered, this
+  triggers no further candidate.
+- The wider grid improved the selected inner mean in one fold but did not improve outer spellF1
+  under the registered rule. This result applies to the tested grid on B0.
+
+### [dropped] V6: Should transition costs and boundary bonuses depend on direction?
 
 **Hypothesis:** The decoder uses only the detector's H↔A output. Currently, `decode_hsmm` adds its
 log-ratio bonus at every live segment start, including restarts and same-state continuations. These
@@ -424,7 +456,13 @@ has the same property.
   before it reaches the submission.
 - Cost: 2,268 inner `decode_hsmm` calls, the same as B0.
 
-**Outcome:** —
+**Outcome:** Dropped under the registered rule. Run by Younis on B0 (`nested-touch-bal` release,
+SHA-256 `433960d0…`). The pairing check passed as for V5.
+
+- spellF1 0.7146 against 0.7147, a mean difference of −0.0001. One match improves (J03WPY +0.0013),
+  one is worse (J03WR9 −0.0022), and five are exactly tied.
+- Predictions differ from B0 on 51 frames across all seven matches. Restricting the bonus to H↔A
+  transitions barely changes the decoded paths.
 
 ### [pending] V7: Does boundary labeling suppress short possessions?
 
