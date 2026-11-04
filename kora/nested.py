@@ -78,7 +78,8 @@ def hsmm_scores(P, C, y, half, prior, rate, setting):
     out = []
     for k in P:
         ld = log_duration([r for j in P if j != k for r in runs_of(y[j], half[j])])
-        out.append(scores(y[k], decode_hsmm(P[k], C[k], segments_of(half[k]), prior, ld, *setting, rate), half[k])["mean_f1"])
+        out.append(scores(y[k], decode_hsmm(P[k], C[k], segments_of(half[k]), prior, ld,
+                                         *setting[:4], rate, *setting[4:]), half[k])["mean_f1"])
     return out
 
 
@@ -134,13 +135,14 @@ def main():
         ld = log_duration([r for k in ins for r in runs_of(y[k], half[k])])
         seg = segments_of(half[m])
         pred_plain = decode(outer[m], seg, prior, *PLAIN[bp])
-        pred_hsmm = decode_hsmm(outer[m], change[m, m], seg, prior, ld, *HSMM[bh], rate)
+        pred_hsmm = decode_hsmm(outer[m], change[m, m], seg, prior, ld, *HSMM[bh][:4], rate, *HSMM[bh][4:])
         pred = pred_hsmm if keep else pred_plain
         s, s_plain, s_hsmm = scores(y[m], pred, half[m]), scores(y[m], pred_plain, half[m]), scores(y[m], pred_hsmm, half[m])
         folds[m] = {
             "inner_matches": ins, "decoder": "hsmm" if keep else "plain",
             "plain": dict(zip(("alpha", "cost_ha", "cost_d"), PLAIN[bp]), inner_mean=float(plain[bp].mean())),
-            "hsmm": dict(zip(("cost_ha", "cost_d", "w_dur", "beta"), HSMM[bh]), inner_mean=float(hs[bh].mean()), rate=rate),
+            "hsmm": dict(zip(("cost_ha", "cost_d", "w_dur", "beta", "ha_bonus_only"),
+                             (HSMM[bh] + (False,))[:5]), inner_mean=float(hs[bh].mean()), rate=rate),
             "prior": prior.tolist(),
             "spell_f1": s["mean_f1"], "spell_f1_per_iou": {str(t): v["f1"] for t, v in s["per_iou"].items()},
             "n_true": s["n_gt"], "n_pred": s["n_pred"],

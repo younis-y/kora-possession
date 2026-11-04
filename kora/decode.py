@@ -65,11 +65,12 @@ def log_duration(runs):
     return out
 
 
-def hsmm(e, ld, cost_ha, cost_d, w, bonus):
+def hsmm(e, ld, cost_ha, cost_d, w, bonus, ha_bonus_only=False):
     """Semi-Markov Viterbi over blocks. A segment of state k on blocks [j, t) scores
     sum(e[j:t, k]) + w * ld[k, t-j] + bonus[j, k], minus the switching cost from the previous
     segment's state. Same-state segments may follow each other (paying the cost) so possessions
-    longer than DMAX blocks stay possible."""
+    longer than DMAX blocks stay possible.
+    RESEARCH.md V6: ha_bonus_only applies the bonus only to H<->A transitions."""
     T = len(e)
     S = np.vstack([np.zeros(3), np.cumsum(e, 0)])
     C = np.array([[cost_ha, cost_ha, cost_d], [cost_ha, cost_ha, cost_d], [cost_d, cost_d, cost_d]], float)
@@ -81,12 +82,18 @@ def hsmm(e, ld, cost_ha, cost_d, w, bonus):
     for t in range(1, T + 1):
         D = min(DMAX, t)
         j = t - np.arange(1, D + 1)
-        cand = Vs[j] - S[j] + ldw[:D] + bonus[j]
+        if ha_bonus_only:
+            cand = Vs[j] - S[j] + ldw[:D]
+        else:
+            cand = Vs[j] - S[j] + ldw[:D] + bonus[j]
         i = cand.argmax(0)
         V[t] = cand[i, (0, 1, 2)] + S[t]
         dur[t] = i + 1
         if t < T:
             M = V[t][:, None] - C
+            if ha_bonus_only:
+                M[0, 1] += bonus[t, 1]
+                M[1, 0] += bonus[t, 0]
             pk = M.argmax(0)
             Vs[t] = M[pk, (0, 1, 2)]
             prev[t] = pk
@@ -101,9 +108,10 @@ def hsmm(e, ld, cost_ha, cost_d, w, bonus):
     return path
 
 
-def decode_hsmm(proba, change, segments, prior, ld, cost_ha, cost_d, w, beta, rate):
+def decode_hsmm(proba, change, segments, prior, ld, cost_ha, cost_d, w, beta, rate, ha_bonus_only=False):
     """Segment decoding of each [start, stop); change = detector P(H<->A change nearby) per frame,
-    rate = its mean on the training matches. Its log-ratio is a bonus for starting a possession."""
+    rate = its mean on the training matches. Its log-ratio is a bonus for starting a possession.
+    RESEARCH.md V6: ha_bonus_only limits it to H<->A transitions."""
     out = np.full(len(proba), -1, np.int8)
     e = emissions(proba, prior, 0.0)
     for a, z in segments:
@@ -112,7 +120,7 @@ def decode_hsmm(proba, change, segments, prior, ld, cost_ha, cost_d, w, beta, ra
         cb = change[a:a + n].reshape(-1, STRIDE).max(1)
         bonus = np.zeros((len(eb) + 1, 3))
         bonus[:-1, :2] = beta * np.log(np.clip(cb, 1e-4, 1.0) / rate)[:, None]
-        p = hsmm(eb, ld, cost_ha, cost_d, w, bonus)
+        p = hsmm(eb, ld, cost_ha, cost_d, w, bonus, ha_bonus_only)
         out[a:a + n] = np.repeat(p, STRIDE)
         out[a + n:z] = p[-1]
     return out
