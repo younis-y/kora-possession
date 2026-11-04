@@ -175,7 +175,7 @@ it is kept only if it also passes against R1. Secondary, reported but not decidi
 
 **Outcome:** —
 
-## Vladymyr ([research/vladymyr-decoder](https://github.com/younis-y/kora-possession/tree/research/vladymyr-decoder)) — error metrics and decoder
+## Vladymyr — error metrics and decoder
 
 ### [verified] V1: Are possessions merged, split, or miscounted?
 
