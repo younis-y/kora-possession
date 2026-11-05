@@ -590,6 +590,29 @@ release, SHA-256 `48816cfb…` for the candidate and `de9dad7c…` for the `touc
   possessions 891 to 878.
 
 
+
+**Pre-registration, round 2 (2026-11-05, before any outer run of this candidate).** Proposed after
+round 1's result, so it is not independent of it (Y2).
+
+- Candidate `v7r2`: `variant.with_detector(<base>, ha_priority=True)`, a deep copy of the base
+  variant with handover-priority detector targets. The base is production after Y9's complete
+  registered decision, including its seed-2028 confirmation. Pin the base name and configuration in
+  `kora/variant.py` before the run. Record the resolved configuration, run commit, and clean-tree
+  state here before running. The candidate uses an explicit base name and does not follow later
+  changes of `PRODUCTION`.
+- Base run: the pinned production variant, evaluated with seed 2027 on the same clean code commit
+  as the candidate. Reuse Y9's production run only if its seed, resolved base configuration, feature
+  and stage-1 versions, decoder and detector settings, and evaluation copies match. Otherwise rerun
+  the base.
+- Decision: the standard rule, unchanged. Keep if the unrounded mean spellF1 difference is positive
+  and at least 5 of 7 matches improve strictly. Ties are not wins. The inner 5-of-6 gate is
+  unchanged. Round 1's ties on plain-decoder folds are a known limit and do not change the rule.
+- Pairing check before reading the result, as in round 1.
+- Secondary, reported but not deciding: the round-1 diagnostics, plus
+  `kora.errors --predictions <v7r2> --compare <base>` (paired possession and match bootstrap).
+- Known limits: the same seven matches as round 1. Round 1's positive bootstrap interval does not
+  make this round confirmatory.
+- Run: Friday 6 November, after Y9, by Younis.
 ### [pending] V8: How does production hold up when the ball is missing far more often?
 
 **Why:** Nested evaluation copies are degraded with the camera-on estimate at a random severity,
