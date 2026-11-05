@@ -53,6 +53,14 @@ BUNDLE_ARRAYS = ("y_true", "y_pred", "half", "ball_seen", "frame")
 DURATION_EDGES_S = (1, 2, 4, 8, 15)
 DURATION_GROUPS = ("<1", "1–2", "2–4", "4–8", "8–15", "15+")
 DURATION_COUNT_FIELDS = ("support", "matched", "missed", "predicted", "matched_predicted", "false_predicted")
+SPELL_ERROR_EDGES_S = (1, 2, 4)
+SPELL_ERROR_GROUPS = ("<1", "1–2", "2–4", "4+")
+SPELL_ERROR_CAUSES = {
+    "missed": ("team swap", "absorbed by other team", "dead ball instead",
+               "same team, boundaries off", "mixed"),
+    "invented": ("team swap", "inside other team's possession", "on dead ball",
+                 "same team, boundaries off", "mixed"),
+}
 TRANSITION_CATEGORIES = {
     "H↔A": ((pm.H, pm.A), (pm.A, pm.H)),
     "H/A→D": ((pm.H, pm.D), (pm.A, pm.D)),
@@ -60,6 +68,8 @@ TRANSITION_CATEGORIES = {
 }
 TRANSITION_PAIRS = tuple(pair for pairs in TRANSITION_CATEGORIES.values() for pair in pairs)
 TRANSITION_COUNT_FIELDS = ("n_true", "n_pred", "matched", "missed", "invented", "ambiguous_true", "ambiguous_pred")
+STOPPAGE_MISS_CAUSES = ("stoppage found, preceding team wrong",
+                        "no predicted stoppage within 25 frames", "other")
 WINDOW_RADIUS = 25  # [c - 25, c + 25), clipped to the half; 1 second at 25 fps.
 WINDOW_ROWS = tuple(f"{category} only" for category in TRANSITION_CATEGORIES) + ("overlapping", "outside all windows")
 WINDOW_INCLUSIVE_ROWS = tuple(f"{category} (inclusive)" for category in TRANSITION_CATEGORIES)
@@ -225,6 +235,37 @@ def _duration_counts(true_lengths, pred_lengths, matches):
     return counts
 
 
+def _spell_error_counts(gt, pred, y_true, filled, pairs, fps):
+    """Partition unmatched spells at IoU 0.5; inputs contain only this half's spells."""
+    # Flip team labels to reuse the official temporal IoU for opposite-team pairs.
+    opposite = pm.spell_overlaps(gt, [(a, b, 1 - team) for a, b, team in pred])
+    swapped_true = {i for iou, i, _ in opposite if iou >= 0.5}
+    swapped_pred = {j for iou, _, j in opposite if iou >= 0.5}
+    matched_true = {i for i, _, _ in pairs}
+    matched_pred = {j for _, j, _ in pairs}
+    result = {}
+    for side, spells, labels, matched, swapped in (
+            ("missed", gt, filled, matched_true, swapped_true),
+            ("invented", pred, y_true, matched_pred, swapped_pred)):
+        causes = SPELL_ERROR_CAUSES[side]
+        counts = {cause: dict.fromkeys(SPELL_ERROR_GROUPS, 0) for cause in causes}
+        for i, (a, b, team) in enumerate(spells):
+            if i in matched:
+                continue
+            cause = causes[0] if i in swapped else causes[-1]
+            if i not in swapped:
+                frames = np.bincount(labels[a:b], minlength=4)
+                for label, candidate in zip((1 - team, pm.D, team), causes[1:4]):
+                    if 2 * frames[label] >= b - a:
+                        cause = candidate
+                        break
+            group = SPELL_ERROR_GROUPS[np.searchsorted(SPELL_ERROR_EDGES_S, (b - a) / fps, side="right")]
+            counts[cause][group] += 1
+        assert sum(sum(row.values()) for row in counts.values()) == len(spells) - len(pairs)
+        result[side] = counts
+    return result
+
+
 def _frame_count_matrix(y_true, y_pred, ball_seen):
     """Counts [true H/A/D, visibility missing/seen, raw prediction H/A/D/X]."""
     index = y_true.astype(np.intp) * 8 + ball_seen.astype(np.intp) * 4 + y_pred.astype(np.intp)
@@ -286,7 +327,7 @@ def _transition_diagnostics(y_true, y_pred, filled, run):
     pred = pm.transitions(filled, [run])
     exact, official = {}, {}
     for tol in pm.TAUS:
-        matched, _, _ = pm.match_transitions(gt, pred, tol, typed="pair")
+        matched, missed, _ = pm.match_transitions(gt, pred, tol, typed="pair")
         exact[tol] = {}
         for key in TRANSITION_PAIRS:
             gs = [t for t in gt if t[1:] == key]
@@ -304,7 +345,24 @@ def _transition_diagnostics(y_true, y_pred, filled, run):
         official[tol] = {key: reference[source] for key, source in
                          (("n_true", "n_gt"), ("n_pred", "n_pred"), ("matched", "n_matched"),
                           ("missed", "n_missed"), ("invented", "n_spurious"))}
-    return {"pairs": exact, "official": official, "windows": _transition_windows(y_true, y_pred, gt, run)}
+        if tol == 25:
+            stoppages = dict.fromkeys(STOPPAGE_MISS_CAUSES, 0)
+            predicted_stoppages = [p for p in pred if p[2] == pm.D]
+            for frame, origin, destination in missed:
+                if origin not in pm.POSSESSION_LABELS or destination != pm.D:
+                    continue
+                nearby = [p for p in predicted_stoppages if abs(p[0] - frame) <= tol]
+                if any(p[1] != origin for p in nearby):
+                    cause = STOPPAGE_MISS_CAUSES[0]
+                elif not nearby:
+                    cause = STOPPAGE_MISS_CAUSES[1]
+                else:
+                    cause = STOPPAGE_MISS_CAUSES[2]
+                stoppages[cause] += 1
+            assert sum(stoppages.values()) == sum(exact[tol][key]["missed"]
+                                                  for key in TRANSITION_CATEGORIES["H/A→D"])
+    return {"pairs": exact, "official": official, "windows": _transition_windows(y_true, y_pred, gt, run),
+            "missed_stoppages": stoppages}
 
 
 def _pool_transition_rows(rows):
@@ -334,6 +392,7 @@ def analyse(y_true, y_pred, half, ball_seen, fps=25):
     no predicted spells. Frame counts use raw predictions: X is wrong, remains
     in every denominator, and is reported separately. No inputs are modified.
     Each half's v4 matrix has axes [true H/A/D, visibility 0/1, raw pred H/A/D/X].
+    spell_errors and v3.missed_stoppages retain only aggregate cause counts.
     """
     y_true, y_pred, half, ball_seen, runs = _validate_inputs(y_true, y_pred, half, ball_seen, fps)
     filled = pm.fill_abstentions(y_pred, runs)
@@ -364,6 +423,7 @@ def analyse(y_true, y_pred, half, ball_seen, fps=25):
             "wrong_frames": int(np.sum(y_true[a:b] != y_pred[a:b])),
             "true_spells": gt, "pred_spells": pred,
             "matches": matches,
+            "spell_errors": _spell_error_counts(gt, pred, y_true, filled, matches[0.5], fps),
             "v2": _duration_counts(true_lengths, pred_lengths, matches),
             "v3": _transition_diagnostics(y_true, y_pred, filled, (a, b)),
             "v4": _frame_count_matrix(y_true[a:b], y_pred[a:b], ball_seen[a:b]),
@@ -513,6 +573,23 @@ def _print_duration_report(halves):
                for iou in pm.SPELL_IOUS]) for group in DURATION_GROUPS])
 
 
+def _print_spell_error_report(halves):
+    print("Possession error causes at IoU 0.5 (filled predictions, pooled half-local counts).\n")
+    print("Each unmatched spell receives the first applicable cause: team swap, at least 50% "
+          "other-team frames, at least 50% D, at least 50% same-team frames, then mixed.\n")
+    for side, header, share in (("missed", "Missed true cause", "Share of all missed"),
+                                ("invented", "Invented predicted cause", "Share of all invented")):
+        counts = {cause: [sum(h["spell_errors"][side][cause][group] for h in halves)
+                          for group in SPELL_ERROR_GROUPS] for cause in SPELL_ERROR_CAUSES[side]}
+        totals = [sum(row[k] for row in counts.values()) for k in range(len(SPELL_ERROR_GROUPS))]
+        total = sum(totals)
+        _table((header, *[f"{group} s" for group in SPELL_ERROR_GROUPS], "Total", share),
+               [(cause, *row, sum(row), _ratio(sum(row), total)) for cause, row in counts.items()]
+               + [("Total", *totals, total, _ratio(total, total))])
+    print("Team-swap counts identify possessions with timing overlap at IoU >= 0.5 and the wrong team. "
+          "Boundary errors may remain.\n")
+
+
 def _print_frame_report(halves):
     counts = np.zeros((3, 2, 4), dtype=np.int64)
     for h in halves:
@@ -588,6 +665,15 @@ def _print_transition_report(halves):
            + [window_row(WINDOW_UNION, WINDOW_UNION + " — subtotal")])
     print("Inclusive rows overlap, so their shares can sum above 1; "
           "the exclusive rows partition all frames and wrong frames.\n")
+    stoppages = {cause: sum(h["v3"]["missed_stoppages"][cause] for h in halves)
+                 for cause in STOPPAGE_MISS_CAUSES}
+    total = sum(stoppages.values())
+    print("V3 missed true live→D transitions under exact pairs at 25 frames. "
+          "Nearby predicted transitions into D use filled predictions within the same half. "
+          "Proximity checks may reuse a predicted stoppage.\n")
+    _table(("Missed true live→D cause (25 frames)", "Count", "Share of missed stoppages"),
+           [(cause, count, _ratio(count, total)) for cause, count in stoppages.items()]
+           + [("Total", total, _ratio(total, total))])
 
 
 def print_report(meta, results):
@@ -644,6 +730,7 @@ def print_report(meta, results):
            [[sum(h["associations"][key] for _, h in halves)
              for key in ("positive_overlaps", "retained_overlaps", "discarded_overlaps")]])
     _print_duration_report([h for _, h in halves])
+    _print_spell_error_report([h for _, h in halves])
     _print_frame_report([h for _, h in halves])
     _print_transition_report([h for _, h in halves])
 
