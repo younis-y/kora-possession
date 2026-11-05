@@ -188,6 +188,49 @@ Following J6's registration, `mixed`, `b0_rand` and `mixed_rand` now sit on top 
 J6 rule 2 reads `python -m kora.compare touch_bal mixed`. The committed submission was built with B0
 and must be rebuilt with `build.sh` before the freeze.
 
+### [pending] Y7: Do a stage-2 refiner, a wider grid, dwell features or stronger balancing recover short possessions? (Y7a, Y7c, Y8a, Y8b)
+
+**Hypothesis:** on R2's held-out predictions, missed possessions under 2 s are still the largest
+error (oracle headroom +0.11). In 46% of them stage 1 has the right team on most frames but the decoder
+smooths them away. In the other 54% stage 1 is undecided (mean p(true team) 0.49-0.52). Team swaps are
+6% of misses (V1, PR #11).
+
+**Candidates (pre-registered 2026-11-05, before any outer score of these variants).** Each is
+`touch_bal` plus one change, in `kora/variant.py`:
+
+- `y7a_refine` (decoder smoothing; the MS-TCN idea, Abu Farha & Gall 2019). A second gradient-boosted
+  model reads the detector's context windows (`boundary.context`: stage-1 probabilities over
+  0.5-32 s, plus raw signals) and outputs H/A/D probabilities. These replace stage 1's in both decoders.
+  It is fitted on exactly the detector's folds (`nested.fit_refiner`), so it inherits the detector's
+  small leak (J1). The detector itself still reads stage 1. Stage 1 is reused.
+- `y7c_wide`: V5's 180-setting HSMM grid on production instead of B0. R2's sharper
+  probabilities may choose lower switching costs. Stage 1 is reused.
+- `y8a_dwell` (undecided stage 1; Link & Hoernig 2017). Nine columns from `kora/dwell.py`, derived
+  from existing features:
+  - seconds the close side has held, backward and forward;
+  - changes of the close side in the past and next 1 s and 2 s;
+  - the far team's distance to the ball, its 0.5 s mean and its ±0.5 s change.
+  It uses the 1.5 m radius that `features.py` already applies. Nothing is tuned on labels. Stage 1 is refitted.
+- `y8b_bal1`: possession-balanced weights at λ = 1.0 instead of 0.5. Stage 1 is refitted.
+
+**Decision rule:**
+
+1. Each candidate is run with `python -m kora.nested --variant <v>` and compared with
+   `python -m kora.compare touch_bal <v>`. Keep it if the mean spellF1 is higher and at least 5 of 7
+   matches improve strictly.
+2. Every kept candidate goes into one combined variant (Y9) on top of the production variant at
+   that time. V7 or J6 may change production first. Y9 is kept by the same rule against production.
+3. Four candidates against one baseline can pass by luck. So Y9 and production are both rerun with
+   stage-1 seed 2028, and Y9's mean must still be higher there.
+
+Secondary, reported but not deciding: recall at IoU 0.5 under 1 s and 1-2 s, the count ratio, and
+`kora.errors` causes on the bundles.
+
+**Deployment:** Y7a and Y8a are wired into `kora.run` and `kora.train` only if they pass. Y7c and
+Y8b are configuration only.
+
+**Outcome:** —
+
 ## Vladymyr — error metrics and decoder
 
 ### [verified] V1: Are possessions merged, split, or miscounted?

@@ -39,6 +39,11 @@ VARIANTS = {
     "v5_wide": {"decoder": {"hsmm_grid": V5_HSMM_GRID}},
     # RESEARCH.md V6 round 1: B0 settings with handover-only boundary bonuses.
     "v6_ha_only": {"decoder": {"hsmm_grid": [s + (True,) for s in V5_HSMM_GRID[:54]]}},
+    # RESEARCH.md Y7/Y8 (pre-registered 2026-11-05), each alone on top of touch_bal.
+    "y7a_refine": {"touch": True, "balance": 0.5, "decoder": {"refine": True}},       # stage-2 refiner
+    "y7c_wide": {"touch": True, "balance": 0.5, "decoder": {"hsmm_grid": V5_HSMM_GRID}},
+    "y8a_dwell": {"touch": True, "balance": 0.5, "dwell": True},                    # kora/dwell.py
+    "y8b_bal1": {"touch": True, "balance": 1.0},
 }
 PRODUCTION = "touch_bal"                              # Y6: R2 passed against B0 and R1
 FEATURE_KEYS = ("touch", "mixed", "eval_rand")
@@ -46,8 +51,9 @@ TRAIN_KEYS = ("balance",)
 
 # Decoder selection in kora.nested. A variant overrides any key under "decoder"; nothing here touches the
 # stage-1 caches. Grids are lists of tuples: plain (alpha, cost_ha, cost_d), hsmm (cost_ha, cost_d, w_dur,
-# beta); None means the default grids (kora.train GRID_*, kora.boundary GRID).
-DECODER = {"inner_wins": 5, "plain_grid": None, "hsmm_grid": None}
+# beta); None means the default grids (kora.train GRID_*, kora.boundary GRID). refine: decode stage-2
+# probabilities (kora.nested.fit_refiner, Y7a) instead of stage 1's.
+DECODER = {"inner_wins": 5, "plain_grid": None, "hsmm_grid": None, "refine": False}
 DETECTOR = {"ha_priority": False}
 
 
@@ -84,7 +90,10 @@ def feature_version(config=CONFIG):
 
 def stage1_version(config=CONFIG):
     switches = json.dumps({k: config.get(k) for k in TRAIN_KEYS}, sort_keys=True)
-    return feature_version(config) + "s" + _hash([(ROOT / "kora" / "train.py").read_bytes(), switches])
+    parts = [(ROOT / "kora" / "train.py").read_bytes(), switches]
+    if config.get("dwell"):            # Y8a, added later: keyed only when on, so older caches keep their names
+        parts.append((ROOT / "kora" / "dwell.py").read_bytes())
+    return feature_version(config) + "s" + _hash(parts)
 
 
 def decoder(config=CONFIG):

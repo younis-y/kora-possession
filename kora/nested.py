@@ -13,6 +13,9 @@ and the plain decoder settings were fit on all seven. Here, per outer match m:
 3. the HSMM is used on m only if it beats the plain decoder on the inner mean and on at least
    `inner_wins` of the 6 inner matches (default 5; grids and the rule come from kora.variant.decoder).
 
+With decoder "refine" (Y7a) a stage-2 model re-reads windows of the stage-1 probabilities and its H/A/D
+probabilities replace stage 1's in both decoders; it is fitted on the same folds as the detector.
+
     python -m kora.nested --variant b0     # a few hours on first run (stage-1 folds are cached)
 
 Writes models/nested_<variant>.json (settings and scores per fold, committed) and
@@ -29,6 +32,7 @@ import numpy as np
 from joblib import Parallel, delayed
 
 from .boundary import GRID, RAW, context, model as detector, runs_of, target
+from . import dwell
 from .data import cache_dir
 from .decode import decode, decode_hsmm, log_duration
 from .external import MATCHES
@@ -71,6 +75,13 @@ def fit_detector(ctx, tgt, train, test):
     return detector().fit(X, y).predict_proba(ctx[test])[:, 1]
 
 
+def fit_refiner(ctx, labels, train, test):
+    """Stage 2 (Y7a, the MS-TCN idea): H/A/D probabilities on test from the detector's context windows."""
+    X = np.concatenate([ctx[j][::2] for j in train])
+    y = np.concatenate([labels[j][::2] for j in train])
+    return detector().fit(X, y).predict_proba(ctx[test])
+
+
 def plain_scores(P, y, half, prior, setting):
     return [scores(y[k], decode(P[k], segments_of(half[k]), prior, *setting), half[k])["mean_f1"] for k in P]
 
@@ -91,6 +102,8 @@ def main():
     t0 = time.time()
     print(f"variant {NAME} {CONFIG}  features {FEATURE_VERSION}  stage 1 {STAGE1_VERSION}", flush=True)
     data = {m: copies(m) for m in MATCHES}
+    if CONFIG.get("dwell"):                                            # Y8a: columns derived from the cache
+        data = {m: ([(dwell.add(X), lab) for X, lab in tr], (dwell.add(ev[0]), *ev[1:])) for m, (tr, ev) in data.items()}
     y = {m: data[m][1][1] for m in MATCHES}
     half = {m: data[m][1][2] for m in MATCHES}
     raw = {m: data[m][1][0][RAW] for m in MATCHES}
@@ -117,6 +130,14 @@ def main():
                               tgt, [j for j in MATCHES if j not in (m, k)], k) for m, k in jobs)
     change = dict(zip(jobs, preds))
     print(f"detectors done ({time.time() - t0:.0f} s)", flush=True)
+    if DECODER["refine"]:                                              # Y7a: same folds as the detector
+        preds = Parallel(n_jobs=len(MATCHES))(
+            delayed(fit_refiner)({j: ctx[m, j] for j in MATCHES if j != m or k == m},
+                                 y, [j for j in MATCHES if j not in (m, k)], k) for m, k in jobs)
+        refined = dict(zip(jobs, preds))
+        inner = {(m, k): refined[m, k] for m, k in inner}
+        outer = {m: refined[m, m] for m in MATCHES}
+        print(f"refiners done ({time.time() - t0:.0f} s)", flush=True)
 
     folds, bundle = {}, {}
     for m in MATCHES:
