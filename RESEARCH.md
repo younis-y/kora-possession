@@ -741,6 +741,11 @@ round 1's result, so it is not independent of it (Y2).
 - Known limits: the same seven matches as round 1. Round 1's positive bootstrap interval does not
   make this round confirmatory.
 - Run: Friday 6 November, after Y9, by Younis.
+- Base pinned (2026-11-06, before the run): Y9 kept no candidate, because Y7a, Y7c, Y8a and Y8b were all
+  dropped, so the post-Y9 production is `mixed`. `kora/variant.py` defines
+  `VARIANTS["v7r2"] = with_detector("mixed", ha_priority=True)`, resolving to `{"touch": True,
+  "balance": 0.5, "mixed": True, "detector": {"ha_priority": True}}`, with the same feature and
+  stage-1 versions as `mixed`. The run commit and clean-tree state are recorded with the result.
 ### [pending] V8: How does production hold up when the ball is missing far more often?
 
 **Why:** Nested evaluation copies are degraded with the camera-on estimate at a random severity,
