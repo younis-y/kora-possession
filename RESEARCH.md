@@ -185,8 +185,9 @@ it is kept only if it also passes against R1. Secondary, reported but not decidi
 Secondary: recall at IoU 0.5 for true possessions under 1 s 0.208 (B0), 0.271 (R1), 0.268 (R2);
 1-2 s 0.439, 0.514, 0.538; count ratio 0.834, 0.858, 0.870; spellF1 at IoU 0.7 0.611, 0.644, 0.662.
 Following J6's registration, `mixed`, `b0_rand` and `mixed_rand` now sit on top of `touch_bal`, and
-J6 rule 2 reads `python -m kora.compare touch_bal mixed`. The committed submission was built with B0
-and must be rebuilt with `build.sh` before the freeze.
+J6 rule 2 reads `python -m kora.compare touch_bal mixed`. The committed submission was rebuilt with
+`touch_bal` on 2026-11-05 (commit 7007d78). The all-match CV kept the plain decoder there, because the
+detector improved fewer than 5 of 7 matches.
 
 ### [pending] Y7: Do a stage-2 refiner, a wider grid, dwell features or stronger balancing recover short possessions? (Y7a, Y7c, Y8a, Y8b)
 
