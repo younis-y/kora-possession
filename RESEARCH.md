@@ -222,6 +222,8 @@ smooths them away. In the other 54% stage 1 is undecided (mean p(true team) 0.49
    that time. V7 or J6 may change production first. Y9 is kept by the same rule against production.
 3. Four candidates against one baseline can pass by luck. So Y9 and production are both rerun with
    stage-1 seed 2028, and Y9's mean must still be higher there.
+   (Amended 2026-11-05, before any Y7/Y8 outer score: the seed switch is `"seed": 2028` in a variant.
+   It changes the degraded copies and stage 1 together, for example `mixed_s2028`.)
 
 Secondary, reported but not deciding: recall at IoU 0.5 under 1 s and 1-2 s, the count ratio, and
 `kora.errors` causes on the bundles.

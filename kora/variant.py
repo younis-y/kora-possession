@@ -44,6 +44,8 @@ VARIANTS = {
     "y7c_wide": {"touch": True, "balance": 0.5, "decoder": {"hsmm_grid": V5_HSMM_GRID}},
     "y8a_dwell": {"touch": True, "balance": 0.5, "dwell": True},                    # kora/dwell.py
     "y8b_bal1": {"touch": True, "balance": 1.0},
+    # Y7 confirmation: the same pipeline with seed 2028 for the degraded copies and stage 1.
+    "mixed_s2028": {"touch": True, "balance": 0.5, "mixed": True, "seed": 2028},
 }
 PRODUCTION = "touch_bal"                              # Y6: R2 passed against B0 and R1
 FEATURE_KEYS = ("touch", "mixed", "eval_rand")
@@ -85,6 +87,8 @@ def feature_version(config=CONFIG):
     if config.get("mixed") or config.get("eval_rand"):
         files.append(ROOT / "models" / "degrade_external_all.json")
     switches = json.dumps({k: config.get(k) for k in FEATURE_KEYS}, sort_keys=True)
+    if config.get("seed"):             # added later: keyed only when set, so older caches keep their names
+        switches += f"seed{config['seed']}"
     return "f" + _hash([f.read_bytes() for f in files] + [switches])
 
 
