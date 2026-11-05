@@ -222,6 +222,8 @@ smooths them away. In the other 54% stage 1 is undecided (mean p(true team) 0.49
    that time. V7 or J6 may change production first. Y9 is kept by the same rule against production.
 3. Four candidates against one baseline can pass by luck. So Y9 and production are both rerun with
    stage-1 seed 2028, and Y9's mean must still be higher there.
+   (Amended 2026-11-05, before any Y7/Y8 outer score: the seed switch is `"seed": 2028` in a variant.
+   It changes the degraded copies and stage 1 together, for example `mixed_s2028`.)
 
 Secondary, reported but not deciding: recall at IoU 0.5 under 1 s and 1-2 s, the count ratio, and
 `kora.errors` causes on the bundles.
@@ -590,6 +592,29 @@ release, SHA-256 `48816cfb…` for the candidate and `de9dad7c…` for the `touc
   possessions 891 to 878.
 
 
+
+**Pre-registration, round 2 (2026-11-05, before any outer run of this candidate).** Proposed after
+round 1's result, so it is not independent of it (Y2).
+
+- Candidate `v7r2`: `variant.with_detector(<base>, ha_priority=True)`, a deep copy of the base
+  variant with handover-priority detector targets. The base is production after Y9's complete
+  registered decision, including its seed-2028 confirmation. Pin the base name and configuration in
+  `kora/variant.py` before the run. Record the resolved configuration, run commit, and clean-tree
+  state here before running. The candidate uses an explicit base name and does not follow later
+  changes of `PRODUCTION`.
+- Base run: the pinned production variant, evaluated with seed 2027 on the same clean code commit
+  as the candidate. Reuse Y9's production run only if its seed, resolved base configuration, feature
+  and stage-1 versions, decoder and detector settings, and evaluation copies match. Otherwise rerun
+  the base.
+- Decision: the standard rule, unchanged. Keep if the unrounded mean spellF1 difference is positive
+  and at least 5 of 7 matches improve strictly. Ties are not wins. The inner 5-of-6 gate is
+  unchanged. Round 1's ties on plain-decoder folds are a known limit and do not change the rule.
+- Pairing check before reading the result, as in round 1.
+- Secondary, reported but not deciding: the round-1 diagnostics, plus
+  `kora.errors --predictions <v7r2> --compare <base>` (paired possession and match bootstrap).
+- Known limits: the same seven matches as round 1. Round 1's positive bootstrap interval does not
+  make this round confirmatory.
+- Run: Friday 6 November, after Y9, by Younis.
 ### [pending] V8: How does production hold up when the ball is missing far more often?
 
 **Why:** Nested evaluation copies are degraded with the camera-on estimate at a random severity,
@@ -615,6 +640,22 @@ loss.
   Every value comes from external data. The every-frame share is close to the organisers' published
   41% for the challenge match. That similarity is why this condition is reported, and it sets no
   parameter.
+
+**Amendment after J6, before any V8 run (2026-11-05). Report only.** J6 passed its registered rules
+and production is changing to `mixed`. This round runs only `mixed_stress`
+(`mixed` plus `eval_stress`), replacing the scheduled `touch_bal_stress` run.
+
+- Training copies and their RNG draws remain identical to `mixed`. Every evaluation copy uses
+  `degrade` at severity 1 with `degrade_external_all.json`, including player gaps and close-ups. The
+  detector is refitted and decoder settings are reselected using stressed copies.
+- J6's random-gap test uses the same `random_ball` generator as `mixed`'s odd training copies. V8's
+  gaps are label-conditioned instead, with separate live gap lengths and stoppage offsets, so this
+  checks `mixed` under a heavier profile of the mechanism its other training copies already use.
+- Run `python -m kora.nested --variant mixed_stress`, followed by the registered diagnostics. Use
+  J6's normal-condition `mixed` result as descriptive context. The registered reporting measures and
+  external parameters are unchanged. This report will not select, tune, or change production and
+  does not estimate the challenge score. J6 informed this amendment, so it is not independent
+  confirmation.
 
 **Outcome:** —
 

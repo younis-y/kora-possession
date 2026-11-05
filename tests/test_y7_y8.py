@@ -93,6 +93,12 @@ class CacheKeyTests(unittest.TestCase):
             self.assertEqual(variant.feature_version(v[name]), variant.feature_version(bal))
             self.assertNotEqual(variant.stage1_version(v[name]), variant.stage1_version(bal))
 
+    def test_seed_runs_get_their_own_caches_and_leave_others_alone(self):
+        v = variant.VARIANTS
+        self.assertNotEqual(variant.feature_version(v["mixed_s2028"]), variant.feature_version(v["mixed"]))
+        self.assertEqual(variant.feature_version({**v["mixed_s2028"], "seed": None}),
+                         variant.feature_version(v["mixed"]))
+
     def test_refine_is_off_unless_asked(self):
         self.assertFalse(variant.decoder(variant.VARIANTS["touch_bal"])["refine"])
         self.assertTrue(variant.decoder(variant.VARIANTS["y7a_refine"])["refine"])

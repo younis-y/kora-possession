@@ -33,10 +33,11 @@ from joblib import Parallel, delayed
 
 from .boundary import GRID, RAW, context, model as detector, runs_of, target
 from . import dwell
+from . import train as _train
 from .data import cache_dir
 from .decode import decode, decode_hsmm, log_duration
 from .external import MATCHES
-from .train import (FEATURE_VERSION, GRID_ALPHA, GRID_D, GRID_HA, MODELS, SEED, STAGE1_VERSION, SUBSAMPLE,
+from .train import (FEATURE_VERSION, GRID_ALPHA, GRID_D, GRID_HA, MODELS, STAGE1_VERSION, SUBSAMPLE,
                     TRAIN_COPIES, copies, fit_classifier, segments_of)
 from .variant import CONFIG, NAME, VARIANTS, decoder, detector as detector_config
 from .vendor import possession_metrics as pm
@@ -99,6 +100,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--variant", default=NAME, choices=VARIANTS, help="read at import by kora.variant")
     parser.parse_args()
+    if CONFIG.get("seed"):             # read at call time by kora.train (copies, classifier)
+        _train.SEED = CONFIG["seed"]
     t0 = time.time()
     print(f"variant {NAME} {CONFIG}  features {FEATURE_VERSION}  stage 1 {STAGE1_VERSION}", flush=True)
     data = {m: copies(m) for m in MATCHES}
@@ -183,7 +186,7 @@ def main():
                           "the rate, the duration prior and decoder selection; scored once. "
                           "Ball and player gaps are simulated from external measurements (kora/degrade.py), "
                           "not challenge tracking.",
-            "commit": commit, "dirty": dirty, "seed": SEED, "variant": NAME, "config": CONFIG,
+            "commit": commit, "dirty": dirty, "seed": _train.SEED, "variant": NAME, "config": CONFIG,
             "feature_version": FEATURE_VERSION, "stage1_version": STAGE1_VERSION, "inner_wins": INNER_WINS, "decoder": DECODER,
             "detector": DETECTOR_CFG,
             "train_copies": TRAIN_COPIES, "subsample": SUBSAMPLE}
