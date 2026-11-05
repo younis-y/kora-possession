@@ -113,7 +113,7 @@ this when the owner first chose every frame (overall share 40%), which is why th
 the external-only check. In-use values: close-up probability 0.026 per long stoppage, player visible
 16.8 s mean, positional noise 0 (SkillCorner is smoother than IDSSE). `kora/degrade.py` reads only that file. Each training copy draws a
 severity s ~ U(0, 1) that scales every process from clean IDSSE (0) to SkillCorner broadcast (1).
-The duration-matched stress test on José's branch still samples challenge gap lengths; it must move to `gap_s_quantiles` / `missing_share` in the external JSON before it is used again. Caches are keyed by a hash of
+The duration-matched stress test on José's branch reads `gap_s_quantiles` / `missing_share` from the external JSON (`891d61d`). Caches are keyed by a hash of
 the feature and degradation code plus the external parameters (`kora/variant.py`).
 
 **Which estimate: external-only rule (pre-registered 2026-11-03, before running; raised by Vladymyr).**
@@ -754,7 +754,7 @@ so these are paired comparisons, not nested scores. Degradation is pre-Y5. Next:
 as a variant on B0 (label-independent gaps on odd training copies) and score it with
 `kora.nested` + `kora.compare` after R0. Logs: `data/j1-mixed/` (local).
 
-### [pending] J6: Does mixed training beat B0 when the ball goes missing at random?
+### [verified] J6: Does mixed training beat B0 when the ball goes missing at random?
 
 **Hypothesis:** J1's gain carries over to the external degradation (Y5): training copies whose ball
 gaps ignore the labels make the model less dependent on "ball missing means stoppage".
@@ -784,7 +784,30 @@ gaps ignore the labels make the model less dependent on "ball missing means stop
 
 Secondary, reported but not deciding: means, short-possession recall, count ratio.
 
-**Outcome:** —
+**Outcome (2026-11-05, `python -m kora.compare`, seed 2027, all four runs clean; `touch_bal` and
+`mixed_rand` at `7914131`, `mixed` at `222f776`, `b0_rand` at `ad0319e`):** both rules hold.
+
+| comparison | means | per match (J03WPY, J03WN1, J03WMX, J03WOH, J03WQQ, J03WOY, J03WR9) | wins |
+| --- | --- | --- | --- |
+| 1. `b0_rand` → `mixed_rand` | 0.5726 → 0.6607 (+0.0881) | +0.070 +0.075 +0.084 +0.106 +0.096 +0.075 +0.111 | 7/7 |
+| 2. `touch_bal` → `mixed` | 0.7528 → 0.7511 (−0.0017) | −0.002 +0.016 +0.003 +0.014 −0.003 −0.022 −0.019 | 3/7 |
+
+Secondary: count ratio 0.695 → 0.826 under random gaps and 0.870 → 0.879 on the normal copies;
+spellF1 at IoU 0.7 0.466 → 0.539 and 0.662 → 0.657. At IoU 0.5, recall for true possessions
+under 1 s was 81/384 → 64/384 under random gaps and 103/384 → 101/384 on normal copies. Recall
+for 1–2 s was 182/535 → 207/535 under random gaps and 288/535 → 287/535 on normal copies.
+
+Paired possession bootstrap on the released bundles (1,000 draws, seed 0, 5th–95th percentiles):
+random gaps +0.0758 to +0.1004; normal copies −0.0078 to +0.0039. Both pairs passed checks for
+match order, labels, half, frame and ball visibility. These intervals describe resampling on seven
+matches and do not establish equivalence, replace the registered rules, or verify provenance.
+
+**Decision (2026-11-05):** kept under the J6 rule. Under label-free random gaps the production model
+loses 0.180 (0.7528 → 0.5726) and predicts 30% too few possessions; mixed training recovers about
+half of that on every match, at a cost of 0.0017 on the normal copies, inside the 0.01 limit. The
+general keep rule (mean up and 5/7) is not met on the normal copies. J6 was registered as a
+robustness rule, not a score rule. The team selected `mixed`, but the production switch was
+reverted pending an update to `test_v7_targets`; `PRODUCTION` remains `touch_bal` at this commit.
 
 ### [dropped] J2: Can player movement identify possession during ball gaps?
 
