@@ -1,0 +1,31 @@
+{
+  "swallowed": 470,
+  "levels": [
+    {
+      "detector_theta": 0.3,
+      "detector_false": 1184,
+      "detector_cut": 62,
+      "event_theta": 0.1,
+      "event_false": 1162,
+      "event_cut": 80
+    },
+    {
+      "detector_theta": 0.4,
+      "detector_false": 897,
+      "detector_cut": 47,
+      "event_theta": 0.15,
+      "event_false": 895,
+      "event_cut": 69
+    },
+    {
+      "detector_theta": 0.5,
+      "detector_false": 692,
+      "detector_cut": 32,
+      "event_theta": 0.21,
+      "event_false": 687,
+      "event_cut": 57
+    }
+  ],
+  "event_team_right": 0.7861915367483296,
+  "passed": true
+}

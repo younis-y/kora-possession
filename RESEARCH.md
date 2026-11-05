@@ -352,7 +352,12 @@ columns need a stage-1 refit per excluded set. `spell_f1_noevent` must equal `mi
 filled by straight lines, with a flag column, before features. Both are decided by
 `kora.compare mixed <v>` (mean up and >= 5 of 7 matches better) and checked on heavy-gap copies.
 
-**Outcome:** —
+**Outcome (Y14, 2026-11-05):** dropped. `kora.compare mixed y14_events`: mean 0.7511 -> 0.7521
+(+0.0010), better on 1 of 7 (4 ties, 1 loss of -0.0039); recall under 1 s 0.263 -> 0.273, count ratio
+0.879 -> 0.891. Events beat no events on the inner mean in all 7 folds (+0.004 to +0.010) but passed
+the 5-of-6 inner rule in only 2, so 5 folds fell back to production. The event model is better than
+the detector but at usable false-peak rates still cuts out only 12-17% of swallowed spells; its
+features are the frame columns at the kink. Y15: pending.
 
 ## Vladymyr — error metrics and decoder
 
