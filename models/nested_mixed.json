@@ -1,0 +1,340 @@
+{
+  "schema": 1,
+  "fps": 25,
+  "matches": [
+    "J03WPY",
+    "J03WN1",
+    "J03WMX",
+    "J03WOH",
+    "J03WQQ",
+    "J03WOY",
+    "J03WR9"
+  ],
+  "provenance": "kora.nested: each held-out match excluded from stage 1, the detector, the prior, the rate, the duration prior and decoder selection; scored once. Ball and player gaps are simulated from external measurements (kora/degrade.py), not challenge tracking.",
+  "commit": "222f7764d71e8989e39d8483aa99daf1bdd7b3ef",
+  "dirty": false,
+  "seed": 2027,
+  "variant": "mixed",
+  "config": {
+    "touch": true,
+    "balance": 0.5,
+    "mixed": true
+  },
+  "feature_version": "f07909ffaef",
+  "stage1_version": "f07909ffaefs6612537f8e",
+  "inner_wins": 5,
+  "decoder": {
+    "inner_wins": 5,
+    "plain_grid": null,
+    "hsmm_grid": null
+  },
+  "train_copies": 2,
+  "subsample": 6,
+  "spell_f1_mean": 0.7510818357909834,
+  "spell_f1_std": 0.026998580376009138,
+  "spell_f1_plain_mean": 0.7501448006929007,
+  "spell_f1_hsmm_mean": 0.7560516500755813,
+  "folds": {
+    "J03WPY": {
+      "inner_matches": [
+        "J03WN1",
+        "J03WMX",
+        "J03WOH",
+        "J03WQQ",
+        "J03WOY",
+        "J03WR9"
+      ],
+      "decoder": "plain",
+      "plain": {
+        "alpha": 0.0,
+        "cost_ha": 8,
+        "cost_d": 64,
+        "inner_mean": 0.7523596659513879
+      },
+      "hsmm": {
+        "cost_ha": 4,
+        "cost_d": 8,
+        "w_dur": 3,
+        "beta": 3,
+        "ha_bonus_only": false,
+        "inner_mean": 0.7541877917911991,
+        "rate": 0.02536110238504319
+      },
+      "prior": [
+        0.27531683258489154,
+        0.27531683258489154,
+        0.449366334830217
+      ],
+      "spell_f1": 0.7496259351620946,
+      "spell_f1_per_iou": {
+        "0.3": 0.8154613466334165,
+        "0.4": 0.7905236907730673,
+        "0.5": 0.7556109725685786,
+        "0.6": 0.7082294264339152,
+        "0.7": 0.6783042394014962
+      },
+      "n_true": 421,
+      "n_pred": 381,
+      "spell_f1_plain": 0.7496259351620946,
+      "spell_f1_hsmm": 0.754040404040404
+    },
+    "J03WN1": {
+      "inner_matches": [
+        "J03WPY",
+        "J03WMX",
+        "J03WOH",
+        "J03WQQ",
+        "J03WOY",
+        "J03WR9"
+      ],
+      "decoder": "hsmm",
+      "plain": {
+        "alpha": 0.0,
+        "cost_ha": 8,
+        "cost_d": 16,
+        "inner_mean": 0.7474967808978882
+      },
+      "hsmm": {
+        "cost_ha": 8,
+        "cost_d": 8,
+        "w_dur": 3,
+        "beta": 4,
+        "ha_bonus_only": false,
+        "inner_mean": 0.7520596235003661,
+        "rate": 0.024345902436094056
+      },
+      "prior": [
+        0.2814494551130188,
+        0.2814494551130188,
+        0.4371010897739625
+      ],
+      "spell_f1": 0.7598691384950926,
+      "spell_f1_per_iou": {
+        "0.3": 0.8418756815703381,
+        "0.4": 0.8091603053435115,
+        "0.5": 0.7699018538713194,
+        "0.6": 0.7241003271537623,
+        "0.7": 0.6543075245365321
+      },
+      "n_true": 500,
+      "n_pred": 417,
+      "spell_f1_plain": 0.7578040904198062,
+      "spell_f1_hsmm": 0.7598691384950926
+    },
+    "J03WMX": {
+      "inner_matches": [
+        "J03WPY",
+        "J03WN1",
+        "J03WOH",
+        "J03WQQ",
+        "J03WOY",
+        "J03WR9"
+      ],
+      "decoder": "plain",
+      "plain": {
+        "alpha": 0.0,
+        "cost_ha": 16,
+        "cost_d": 32,
+        "inner_mean": 0.7530034123278071
+      },
+      "hsmm": {
+        "cost_ha": 2,
+        "cost_d": 8,
+        "w_dur": 4,
+        "beta": 4,
+        "ha_bonus_only": false,
+        "inner_mean": 0.7582224631729225,
+        "rate": 0.024309798472450992
+      },
+      "prior": [
+        0.273003599893544,
+        0.273003599893544,
+        0.453992800212912
+      ],
+      "spell_f1": 0.7058558558558559,
+      "spell_f1_per_iou": {
+        "0.3": 0.7905405405405406,
+        "0.4": 0.7657657657657657,
+        "0.5": 0.7252252252252251,
+        "0.6": 0.6554054054054055,
+        "0.7": 0.5923423423423423
+      },
+      "n_true": 511,
+      "n_pred": 377,
+      "spell_f1_plain": 0.7058558558558559,
+      "spell_f1_hsmm": 0.7050328227571117
+    },
+    "J03WOH": {
+      "inner_matches": [
+        "J03WPY",
+        "J03WN1",
+        "J03WMX",
+        "J03WQQ",
+        "J03WOY",
+        "J03WR9"
+      ],
+      "decoder": "plain",
+      "plain": {
+        "alpha": 0.0,
+        "cost_ha": 16,
+        "cost_d": 64,
+        "inner_mean": 0.7412147577676992
+      },
+      "hsmm": {
+        "cost_ha": 4,
+        "cost_d": 16,
+        "w_dur": 3,
+        "beta": 4,
+        "ha_bonus_only": false,
+        "inner_mean": 0.7450515747590143,
+        "rate": 0.025328996752386843
+      },
+      "prior": [
+        0.277972282499428,
+        0.277972282499428,
+        0.4440554350011439
+      ],
+      "spell_f1": 0.788663967611336,
+      "spell_f1_per_iou": {
+        "0.3": 0.863697705802969,
+        "0.4": 0.8421052631578947,
+        "0.5": 0.7908232118758435,
+        "0.6": 0.747638326585695,
+        "0.7": 0.6990553306342779
+      },
+      "n_true": 402,
+      "n_pred": 339,
+      "spell_f1_plain": 0.788663967611336,
+      "spell_f1_hsmm": 0.8119480519480519
+    },
+    "J03WQQ": {
+      "inner_matches": [
+        "J03WPY",
+        "J03WN1",
+        "J03WMX",
+        "J03WOH",
+        "J03WOY",
+        "J03WR9"
+      ],
+      "decoder": "hsmm",
+      "plain": {
+        "alpha": 0.0,
+        "cost_ha": 8,
+        "cost_d": 16,
+        "inner_mean": 0.7544830735943534
+      },
+      "hsmm": {
+        "cost_ha": 2,
+        "cost_d": 8,
+        "w_dur": 4,
+        "beta": 4,
+        "ha_bonus_only": false,
+        "inner_mean": 0.7599462106114149,
+        "rate": 0.025464311609917713
+      },
+      "prior": [
+        0.27240297102207345,
+        0.27240297102207345,
+        0.4551940579558531
+      ],
+      "spell_f1": 0.7416563658838072,
+      "spell_f1_per_iou": {
+        "0.3": 0.8207663782447465,
+        "0.4": 0.7911001236093944,
+        "0.5": 0.7564894932014834,
+        "0.6": 0.6996291718170581,
+        "0.7": 0.6402966625463534
+      },
+      "n_true": 401,
+      "n_pred": 408,
+      "spell_f1_plain": 0.7439803439803441,
+      "spell_f1_hsmm": 0.7416563658838072
+    },
+    "J03WOY": {
+      "inner_matches": [
+        "J03WPY",
+        "J03WN1",
+        "J03WMX",
+        "J03WOH",
+        "J03WQQ",
+        "J03WR9"
+      ],
+      "decoder": "hsmm",
+      "plain": {
+        "alpha": 0.0,
+        "cost_ha": 8,
+        "cost_d": 32,
+        "inner_mean": 0.7537719048226955
+      },
+      "hsmm": {
+        "cost_ha": 2,
+        "cost_d": 8,
+        "w_dur": 4,
+        "beta": 4,
+        "ha_bonus_only": false,
+        "inner_mean": 0.7582353640495404,
+        "rate": 0.024925699465665318
+      },
+      "prior": [
+        0.27717398886672157,
+        0.27717398886672157,
+        0.4456520222665569
+      ],
+      "spell_f1": 0.729220023282887,
+      "spell_f1_per_iou": {
+        "0.3": 0.8079161816065192,
+        "0.4": 0.7776484284051223,
+        "0.5": 0.7380675203725261,
+        "0.6": 0.679860302677532,
+        "0.7": 0.6426076833527358
+      },
+      "n_true": 456,
+      "n_pred": 403,
+      "spell_f1_plain": 0.7224018475750578,
+      "spell_f1_hsmm": 0.729220023282887
+    },
+    "J03WR9": {
+      "inner_matches": [
+        "J03WPY",
+        "J03WN1",
+        "J03WMX",
+        "J03WOH",
+        "J03WQQ",
+        "J03WOY"
+      ],
+      "decoder": "plain",
+      "plain": {
+        "alpha": 0.0,
+        "cost_ha": 8,
+        "cost_d": 64,
+        "inner_mean": 0.7418638555058168
+      },
+      "hsmm": {
+        "cost_ha": 4,
+        "cost_d": 8,
+        "w_dur": 3,
+        "beta": 4,
+        "ha_bonus_only": false,
+        "inner_mean": 0.7450100559356253,
+        "rate": 0.025931087025074517
+      },
+      "prior": [
+        0.2733015051773333,
+        0.2733015051773333,
+        0.45339698964533337
+      ],
+      "spell_f1": 0.78268156424581,
+      "spell_f1_per_iou": {
+        "0.3": 0.8519553072625697,
+        "0.4": 0.8324022346368715,
+        "0.5": 0.7960893854748603,
+        "0.6": 0.7430167597765364,
+        "0.7": 0.6899441340782122
+      },
+      "n_true": 370,
+      "n_pred": 346,
+      "spell_f1_plain": 0.78268156424581,
+      "spell_f1_hsmm": 0.7905947441217152
+    }
+  }
+}
