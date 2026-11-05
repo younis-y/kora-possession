@@ -507,7 +507,7 @@ SHA-256 `433960d0…`). The pairing check passed as for V5.
 - Predictions differ from B0 on 51 frames across all seven matches. Restricting the bonus to H↔A
   transitions barely changes the decoded paths.
 
-### [pending] V7: Does boundary labeling suppress short possessions?
+### [dropped] V7: Does boundary labeling suppress short possessions?
 
 **Hypothesis:** Overlapping ±5-frame labels let `np.maximum` replace handover targets with
 dead-ball targets. Wide feature windows may blur nearby transitions.
@@ -516,7 +516,8 @@ dead-ball targets. Wide feature windows may blur nearby transitions.
 weights, and extra weight near short spells. Measure short-spell recall and false fragments
 at all five IoUs.
 
-**Outcome:** Read-only label audit done. The target experiment has not run.
+**Outcome:** Read-only label audit and round-1 target experiment completed. The round-1 result is
+below.
 
 - Scope: `boundary.target` applied to the labels of the seven IDSSE training matches. No
   features, models, or challenge data were used. The audit counts target labels only.
@@ -537,9 +538,9 @@ at all five IoUs.
   target frames for d = 1–10. At separations of at least 11 frames, the two windows do not
   overlap. With two short possessions bracketed by stoppages, all 11 frames of the intervening
   handover target can be overwritten.
-- Not shown: whether different targets change detector quality, short-spell recall, or spellF1.
-  That needs the planned comparison on clean evaluation. Not yet audited: blurring by wide
-  feature windows.
+- The label audit alone does not establish an effect on detector quality, short-spell recall, or
+  spellF1. The round-1 comparison below measures the pipeline change, including the recomputed rate
+  and decoder selection. Blurring by wide feature windows remains unaudited.
 
 
 **Pre-registration, round 1 (2026-11-05, before any outer run of this candidate).** Only the label
@@ -569,6 +570,25 @@ audit above informed the design. No outer score of a V7 candidate exists.
   decoder selection, so a difference is not attributable to the recovered frames alone.
 - Deployment: `kora.boundary` reads the same switch for final fitting. A kept result becomes
   production through `PRODUCTION` and a rebuild.
+
+**Round 1 result (2026-11-05).** Dropped under the registered rule. Run by Younis (`nested-v7`
+release, SHA-256 `48816cfb…` for the candidate and `de9dad7c…` for the `touch_bal` base).
+
+- Pairing check passed: the same commit `7914131` with a clean tree, seed 2027, the same feature and
+  stage-1 versions, and identical truth, half, frame, and visibility arrays. Only the detector switch
+  differs.
+- spellF1 0.7574 against 0.7528, a mean difference of +0.0046. Four matches improve (J03WOH +0.0164,
+  J03WQQ +0.0107, J03WOY +0.0054, J03WMX +0.0024), one is worse (J03WPY −0.0029), and two are
+  exactly tied. Four of seven fails the 5-of-7 rule.
+- The two ties are J03WN1 and J03WR9, where both runs chose the plain decoder, which does not use the
+  change detector. Decoder choices also moved: J03WOH went from plain to HSMM and J03WQQ from HSMM to
+  plain. As registered, the difference is not attributable to the recovered target frames alone.
+- `rate` rose by about 0.0002 in every fold. Predictions differ on 3,073 frames.
+- Secondary diagnostics moved in the hypothesised direction but are not deciding: stoppage recall at
+  25 frames 0.725 to 0.735, missed stoppages with the wrong preceding team 190 to 183, handover recall
+  0.618 to 0.623, recall at IoU 0.5 for `<1` s 0.268 to 0.276 and `1–2` s 0.538 to 0.548, and missed
+  possessions 891 to 878.
+
 ## José — missing-ball robustness and extra data
 
 ### [verified] J1: Does the score depend on one blackout simulation?
