@@ -1,6 +1,7 @@
 """Possession diagnostics from aligned predictions, without fitting or decoding.
 
     python -m kora.errors --predictions BUNDLE.npz
+    python -m kora.errors --predictions CAND.npz --compare BASE.npz --draws 1000 --seed 0
 
 Schema v1 contains scalar JSON ``meta`` (schema, fps, matches, provenance) and,
 for each match M, M__y_true, M__y_pred, M__half, M__ball_seen, M__frame. Frame IDs
@@ -432,8 +433,11 @@ def analyse(y_true, y_pred, half, ball_seen, fps=25):
     return {"fps": fps, "runs": runs, "halves": halves}
 
 
-def load_bundle(path):
-    """Check bundle schema and alignment; do not verify its stated provenance."""
+def load_bundle(path, *, include_frame=False):
+    """Check schema/alignment; optionally retain frames for paired comparisons.
+
+    Stated provenance is not verified. The default four-array return is unchanged.
+    """
     path = Path(path)
     if path.suffix != ".npz":
         raise ValueError("prediction bundle must be an .npz file")
@@ -476,8 +480,101 @@ def load_bundle(path):
                     raise ValueError("frame must be strictly increasing by 1")
             except ValueError as exc:
                 raise ValueError(f"match {m}: {exc}") from exc
-            data[m] = arrays[:4]
+            data[m] = arrays if include_frame else arrays[:4]
     return meta, data
+
+
+def _comparison_spells(arrays, fps):
+    y, pred, _, _, runs = _validate_inputs(*arrays[:4], fps)
+    filled = pm.fill_abstentions(pred, runs)
+    gt = pm.possession_spells(y, runs)
+    predicted = pm.possession_spells(filled, runs)
+    overlaps = pm.spell_overlaps(gt, predicted)
+    flags = np.vstack([pm.matched_gt_flags(overlaps, len(gt), iou) for iou in pm.SPELL_IOUS])
+    return pm.spell_scores(y, filled, runs)["mean_f1"], len(predicted), flags
+
+
+def compare_bundles(base, candidate, *, draws=1000, seed=0):
+    """Return paired aggregate scores; inputs use load_bundle(include_frame=True).
+
+    Pairing is checked before scoring. Spells and X filling stay inside halves;
+    bootstrap indices span all true spells of a match. A match with no true spells
+    contributes zero, like its point score, and stays in the match denominator.
+    """
+    base_meta, base_data = base
+    candidate_meta, candidate_data = candidate
+    matches = base_meta["matches"]
+    if matches != candidate_meta["matches"]:
+        raise ValueError("pairing failed: match IDs must be identical and in the same order")
+    for match in matches:
+        for index, field in enumerate(BUNDLE_ARRAYS):
+            if field != "y_pred" and not np.array_equal(base_data[match][index], candidate_data[match][index]):
+                raise ValueError(f"pairing failed: match {match}: {field} arrays differ")
+    if not isinstance(draws, (int, np.integer)) or draws <= 0:
+        raise ValueError("draws must be a positive integer")
+
+    rng = np.random.RandomState(seed)
+    possession_differences = np.zeros(draws, dtype=np.float64)
+    rows = []
+    for match in matches:
+        base_score, base_count, base_flags = _comparison_spells(base_data[match], base_meta["fps"])
+        candidate_score, candidate_count, candidate_flags = _comparison_spells(
+            candidate_data[match], candidate_meta["fps"])
+        rows.append({"match": match, "base": base_score, "candidate": candidate_score,
+                     "difference": candidate_score - base_score})
+        n_true = base_flags.shape[1]
+        if not n_true:
+            continue
+        flags = np.stack((base_flags, candidate_flags))
+        n_pred = np.array([base_count, candidate_count])[:, None]
+        for draw in range(draws):
+            # Both runs and all IoUs use the same resampled true-spell indices.
+            picks = rng.randint(0, n_true, n_true)
+            tp = flags[:, :, picks].sum(axis=2)
+            fp = np.maximum(0, n_pred - tp)  # Official bootstrap holds n_pred fixed.
+            fn = n_true - tp
+            scores = (2.0 * tp / (2 * tp + fp + fn)).mean(axis=1)
+            possession_differences[draw] += scores[1] - scores[0]
+    possession_differences /= len(matches)
+    differences = np.array([row["difference"] for row in rows])
+    picks = rng.randint(0, len(matches), (draws, len(matches)))
+    match_differences = differences[picks].mean(axis=1)
+    return {
+        "matches": rows, "base_mean": float(np.mean([row["base"] for row in rows])),
+        "candidate_mean": float(np.mean([row["candidate"] for row in rows])),
+        "mean_difference": float(differences.mean()),
+        "wins": int(np.sum(differences > 0)), "ties": int(np.sum(differences == 0)),
+        "losses": int(np.sum(differences < 0)),
+        "possession_interval": tuple(float(x) for x in np.percentile(possession_differences, (5, 95))),
+        "positive_share": float(np.mean(possession_differences > 0)),
+        "match_interval": tuple(float(x) for x in np.percentile(match_differences, (5, 95))),
+        "draws": draws, "seed": seed,
+    }
+
+
+def print_comparison(result):
+    """Print only per-match and resampling aggregates, with no keep decision."""
+    print("Pairing check: passed (match order, y_true, half, frame, ball_seen).\n")
+    rows = [(row["match"], row["base"], row["candidate"], row["difference"])
+            for row in result["matches"]]
+    rows.append(("MEAN", result["base_mean"], result["candidate_mean"], result["mean_difference"]))
+    _table(("Match", "Base spellF1", "Candidate spellF1", "Candidate − base"),
+           [(match, f"{base:.6f}", f"{candidate:.6f}", f"{difference:+.6f}")
+            for match, base, candidate, difference in rows])
+    print(f"Wins / ties / losses: {result['wins']} / {result['ties']} / {result['losses']} "
+          "(strict, unrounded comparisons).\n")
+    print("## Resampling uncertainty\n")
+    print(f"Draws: {result['draws']}; seed: {result['seed']}. "
+          "Intervals use the organiser's 5th/95th percentiles.\n")
+    _table(("Bootstrap", "5th percentile", "95th percentile", "Share of draws with candidate − base > 0"),
+           [("Paired possession", *[f"{x:+.6f}" for x in result["possession_interval"]],
+             f"{result['positive_share']:.6f}"),
+            ("Match", *[f"{x:+.6f}" for x in result["match_interval"]], "n/a")])
+    print(f"Match bootstrap resamples {len(result['matches'])} match differences; "
+          "with seven matches this interval is coarse.\n")
+    print(f"These intervals describe resampling uncertainty on these {len(result['matches'])} matches, "
+          "are not a significance test, and do not replace the registered keep rule. "
+          "The possession bootstrap holds predicted spells fixed, like the official one.\n")
 
 
 def check_legacy_artifacts(models):
@@ -739,8 +836,23 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--predictions", type=Path,
                         help="local schema-v1 bundle of aligned decoded labels (provenance is producer-stated)")
+    parser.add_argument("--compare", type=Path, help="paired baseline bundle; requires --predictions")
+    parser.add_argument("--draws", type=int, default=1000, help="bootstrap draws for --compare (default: 1000)")
+    parser.add_argument("--seed", type=int, default=0, help="bootstrap seed for --compare (default: 0)")
     args = parser.parse_args()
+    if args.compare and not args.predictions:
+        parser.error("--compare requires --predictions")
     try:
+        if args.compare:
+            base = load_bundle(args.compare, include_frame=True)
+            candidate = load_bundle(args.predictions, include_frame=True)
+            print("# Paired spellF1 comparison\n")
+            print("Base provenance: " + base[0]["provenance"])
+            print("Candidate provenance: " + candidate[0]["provenance"])
+            print("Provenance is producer-stated; pairing does not verify fold exclusion.\n")
+            result = compare_bundles(base, candidate, draws=args.draws, seed=args.seed)
+            print_comparison(result)
+            return
         meta, data = load_bundle(args.predictions) if args.predictions else _load_legacy()
         results = [(m, analyse(*arrays, fps=meta["fps"])) for m, arrays in data.items()]
     except (OSError, ValueError, KeyError, TypeError, EOFError, BadZipFile) as exc:

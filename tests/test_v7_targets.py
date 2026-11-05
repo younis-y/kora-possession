@@ -216,5 +216,22 @@ class DetectorRoutingTests(unittest.TestCase):
                     np.testing.assert_array_equal(actual, target(y, half, priority))
 
 
+class WithDetectorTests(unittest.TestCase):
+    def test_copies_base_and_adds_only_detector_settings(self):
+        pinned = variant.with_detector("touch_bal", ha_priority=True)
+        self.assertEqual(pinned, variant.VARIANTS["v7_ha_priority"])
+        self.assertNotIn("detector", variant.VARIANTS["touch_bal"])       # base untouched
+        pinned["touch"] = False
+        self.assertTrue(variant.VARIANTS["touch_bal"]["touch"])           # deep copy
+
+    def test_cache_versions_follow_the_base(self):
+        for base in ("touch_bal", "y8a_dwell", "b0"):
+            pinned = variant.with_detector(base, ha_priority=True)
+            self.assertEqual(variant.feature_version(pinned), variant.feature_version(variant.VARIANTS[base]))
+            self.assertEqual(variant.stage1_version(pinned), variant.stage1_version(variant.VARIANTS[base]))
+            self.assertEqual(variant.detector(pinned)["ha_priority"], True)
+            json.dumps(pinned)
+
+
 if __name__ == "__main__":
     unittest.main()

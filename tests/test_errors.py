@@ -12,6 +12,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -781,8 +782,8 @@ class ErrorChecks(unittest.TestCase):
                            f"{m}__frame": np.arange(918273, 918279)})
         return arrays
 
-    def run_cli(self, path):
-        return subprocess.run([sys.executable, "-B", "-m", "kora.errors", "--predictions", str(path)],
+    def run_cli(self, path, *extra):
+        return subprocess.run([sys.executable, "-B", "-m", "kora.errors", "--predictions", str(path), *map(str, extra)],
                               cwd=ROOT, capture_output=True, text=True, timeout=30)
 
     def test_bundle_cli_end_to_end(self):
@@ -808,6 +809,201 @@ class ErrorChecks(unittest.TestCase):
             self.assertNotIn("918273", completed.stdout)
             self.assertNotIn("[(", completed.stdout)
             self.assertEqual(completed.stderr, "")
+            expected = io.StringIO()
+            with contextlib.redirect_stdout(expected):
+                errors.print_report(meta, [(m, errors.analyse(*arrays, fps=meta["fps"]))
+                                           for m, arrays in data.items()])
+            self.assertEqual(completed.stdout, expected.getvalue())
+
+    def comparison_bundle(self, predictions, truths=None, halves=None):
+        truths = ["HHDDAA"] * len(predictions) if truths is None else truths
+        meta = {"schema": 1, "fps": 25, "matches": [f"M{i}" for i in range(len(predictions))],
+                "provenance": "synthetic only"}
+        data = {}
+        for i, (match, truth, pred) in enumerate(zip(meta["matches"], truths, predictions)):
+            half = np.ones(len(truth), dtype=int) if halves is None else np.asarray(halves[i])
+            data[match] = (codes(truth), codes(pred), half, np.ones(len(truth), dtype=bool),
+                           np.arange(918273, 918273 + len(truth)))
+        return meta, data
+
+    def paired_example(self):
+        base = self.comparison_bundle(["HHDDDD"] + ["HHDDAA"] * 6)
+        candidate = self.comparison_bundle(["HHDDAA"] * 7)
+        return base, candidate
+
+    def save_comparison_bundle(self, path, bundle):
+        meta, data = bundle
+        arrays = {f"{match}__{field}": array for match, values in data.items()
+                  for field, array in zip(errors.BUNDLE_ARRAYS, values)}
+        np.savez(path, meta=json.dumps(meta), **arrays)
+
+    def test_comparison_identical_bundles(self):
+        base, _ = self.paired_example()
+        result = errors.compare_bundles(base, base)
+        self.assertTrue(all(row["difference"] == 0 for row in result["matches"]))
+        self.assertEqual(result["mean_difference"], 0)
+        self.assertEqual((result["wins"], result["ties"], result["losses"]), (0, 7, 0))
+        self.assertEqual(result["possession_interval"], (0, 0))
+        self.assertEqual(result["match_interval"], (0, 0))
+        self.assertEqual(result["positive_share"], 0)
+
+    def test_comparison_fixes_one_missed_spell(self):
+        result = errors.compare_bundles(*self.paired_example())
+        row = result["matches"][0]
+        # Two true spells: baseline TP=1, FP=0, FN=1; candidate TP=2.
+        self.assertEqual(row["base"], 2 / 3)
+        self.assertEqual(row["candidate"], 1)
+        self.assertAlmostEqual(row["difference"], 1 / 3)
+        self.assertAlmostEqual(result["base_mean"], 20 / 21)
+        self.assertEqual(result["candidate_mean"], 1)
+        self.assertAlmostEqual(result["mean_difference"], 1 / 21)
+        self.assertEqual((result["wins"], result["ties"], result["losses"]), (1, 6, 0))
+        low, high = result["possession_interval"]
+        self.assertLessEqual(low, 1 / 21)
+        self.assertGreaterEqual(high, 1 / 21)
+        # Resampling the one matched spell twice gives TP > n_pred; FP must clamp to zero.
+        self.assertEqual(low, 0)
+        self.assertEqual(high, 1 / 7)
+        self.assertGreater(result["positive_share"], 0)
+        self.assertLess(result["positive_share"], 1)
+        reversed_result = errors.compare_bundles(*reversed(self.paired_example()))
+        self.assertAlmostEqual(reversed_result["mean_difference"], -1 / 21)
+        self.assertEqual((reversed_result["wins"], reversed_result["ties"], reversed_result["losses"]), (0, 6, 1))
+        self.assertEqual(reversed_result["possession_interval"], (-high, -low))
+
+    def test_comparison_matches_official_bootstrap(self):
+        truth = "H" * 10 + "D" * 5 + "A" * 10 + "D" * 5 + "H" * 10
+        prediction = "H" * 5 + "D" * 10 + "A" * 15 + "H" * 10
+        for y, p in ((truth, prediction), ("HHDDAA", "HHDDDD")):
+            with self.subTest(truth=y):
+                base = self.comparison_bundle(["X" * len(y)], [y])
+                candidate = self.comparison_bundle([p], [y])
+                result = errors.compare_bundles(base, candidate, draws=317, seed=29)
+                runs = [(0, len(y))]
+                filled = pm.fill_abstentions(codes(p), runs)
+                expected = pm.bootstrap_spell_f1(codes(y), filled, runs, 317, seed=29, percentiles=(5, 95))
+                self.assertEqual(result["possession_interval"], expected)
+                self.assertEqual(result["match_interval"], (result["mean_difference"],) * 2)
+
+    def test_comparison_official_points_and_half_local_filling(self):
+        truths = ["HHHHHHHH", "HHAADDAA", "DDDD", "HHAA"]
+        halves = [[1] * 4 + [2] * 4, [1] * 4 + [2] * 4, [1, 1, 2, 2], [1] * 4]
+        base = self.comparison_bundle(["HHXXXXXX", "HXXXDXAX", "HHHH", "HHHH"], truths, halves)
+        candidate = self.comparison_bundle(["XXXXHHHH", "XXAADXXX", "XXXX", "AAAA"], truths, halves)
+        result = errors.compare_bundles(base, candidate, draws=31, seed=8)
+        for row in result["matches"]:
+            for name, bundle in (("base", base), ("candidate", candidate)):
+                y, p, half, seen, _ = bundle[1][row["match"]]
+                runs = errors._validate_inputs(y, p, half, seen, 25)[-1]
+                official = pm.spell_scores(y, pm.fill_abstentions(p, runs), runs)
+                self.assertEqual(row[name], official["mean_f1"])
+        # Each half is a distinct H spell; X must not fill across the half boundary.
+        self.assertEqual(result["matches"][0]["base"], 2 / 3)
+        self.assertEqual(result["matches"][0]["candidate"], 2 / 3)
+
+    def test_comparison_pairing_failures_before_scoring(self):
+        for field in ("match order", "match IDs", "y_true", "half", "frame", "ball_seen"):
+            with self.subTest(field=field):
+                base, candidate = self.paired_example()
+                if field == "match order":
+                    candidate[0]["matches"].reverse()
+                elif field == "match IDs":
+                    candidate[0]["matches"][0] = "OTHER"
+                else:
+                    index = errors.BUNDLE_ARRAYS.index(field)
+                    candidate[1]["M0"][index][0] += 1 if field != "ball_seen" else -1
+                message = "same order" if field.startswith("match") else f"M0: {field} arrays differ"
+                with mock.patch.object(errors, "_comparison_spells", side_effect=AssertionError("scored before pairing")):
+                    with self.assertRaisesRegex(ValueError, message):
+                        errors.compare_bundles(base, candidate)
+
+    def test_comparison_determinism_and_match_bootstrap(self):
+        base, candidate = self.paired_example()
+        first = errors.compare_bundles(base, candidate, draws=137, seed=42)
+        second = errors.compare_bundles(base, candidate, draws=137, seed=42)
+        self.assertEqual(first, second)
+        # Independent reproduction of paired draws, followed by resampling match differences.
+        rng = np.random.RandomState(42)
+        possession = np.zeros(137)
+        for match in base[0]["matches"]:
+            for draw in range(137):
+                picks = rng.randint(0, 2, 2)
+                if match == "M0":
+                    tp = int(np.sum(picks == 0))
+                    baseline = 2 * tp / (2 * tp + max(0, 1 - tp) + 2 - tp)
+                    possession[draw] = (1 - baseline) / 7
+        differences = [row["difference"] for row in first["matches"]]
+        means = [float(np.mean([differences[i] for i in rng.randint(0, 7, 7)])) for _ in range(137)]
+        self.assertEqual(first["match_interval"], tuple(np.percentile(means, [5, 95])))
+        self.assertEqual(first["possession_interval"], tuple(np.percentile(possession, [5, 95])))
+        self.assertEqual(first["positive_share"], float(np.mean(possession > 0)))
+
+    def test_comparison_without_true_spells(self):
+        base = self.comparison_bundle(["HHHH", ""], ["DDDD", ""])
+        candidate = self.comparison_bundle(["XXXX", ""], ["DDDD", ""])
+        result = errors.compare_bundles(base, candidate, draws=7)
+        self.assertEqual(result["mean_difference"], 0)
+        self.assertEqual(result["possession_interval"], (0, 0))
+        self.assertEqual(result["match_interval"], (0, 0))
+
+    def test_comparison_cli(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base_path, candidate_path = Path(directory, "base.npz"), Path(directory, "candidate.npz")
+            base, candidate = self.paired_example()
+            base[0]["provenance"], candidate[0]["provenance"] = "synthetic base only", "synthetic candidate only"
+            self.save_comparison_bundle(base_path, base)
+            self.save_comparison_bundle(candidate_path, candidate)
+            completed = self.run_cli(candidate_path, "--compare", base_path)
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            self.assertEqual(completed.stderr, "")
+            for text in ("# Paired spellF1 comparison", "## Resampling uncertainty", "Pairing check: passed",
+                         "Base provenance: synthetic base only", "Candidate provenance: synthetic candidate only",
+                         "| Match | Base spellF1 | Candidate spellF1 | Candidate − base |",
+                         "| M0 | 0.666667 | 1.000000 | +0.333333 |",
+                         "| MEAN | 0.952381 | 1.000000 | +0.047619 |", "Wins / ties / losses: 1 / 6 / 0",
+                         "5th percentile", "95th percentile", "with seven matches this interval is coarse",
+                         "not a significance test", "do not replace the registered keep rule",
+                         "holds predicted spells fixed", "Draws: 1000; seed: 0"):
+                self.assertIn(text, completed.stdout)
+            self.assertNotIn("918273", completed.stdout)
+            self.assertNotIn("KEEP", completed.stdout)
+            repeated = self.run_cli(candidate_path, "--compare", base_path, "--draws", 1000, "--seed", 0)
+            self.assertEqual(repeated.stdout, completed.stdout)
+            self.assertEqual(repeated.returncode, 0, repeated.stderr)
+
+    def test_comparison_cli_pairing_and_argument_failures(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base_path, candidate_path = Path(directory, "base.npz"), Path(directory, "candidate.npz")
+            base, _ = self.paired_example()
+            self.save_comparison_bundle(base_path, base)
+            for field in ("match order", "y_true", "half", "frame", "ball_seen"):
+                with self.subTest(field=field):
+                    _, candidate = self.paired_example()
+                    if field == "match order":
+                        candidate[0]["matches"].reverse()
+                    else:
+                        array = candidate[1]["M0"][errors.BUNDLE_ARRAYS.index(field)]
+                        if field == "frame":
+                            array[:] += 1  # Still valid within each bundle, but no longer paired.
+                        else:
+                            array[0] = 0 if field == "ball_seen" else 2
+                    self.save_comparison_bundle(candidate_path, candidate)
+                    completed = self.run_cli(candidate_path, "--compare", base_path)
+                    self.assertEqual(completed.returncode, 2)
+                    self.assertIn("pairing failed", completed.stderr)
+                    self.assertNotIn("Traceback", completed.stderr)
+                    self.assertIn("Base provenance:", completed.stdout)
+                    self.assertIn("Candidate provenance:", completed.stdout)
+                    self.assertNotIn("Base spellF1", completed.stdout)
+            self.save_comparison_bundle(candidate_path, self.paired_example()[1])
+            for option, value in (("--draws", 0), ("--draws", -1), ("--seed", -1)):
+                completed = self.run_cli(candidate_path, "--compare", base_path, option, value)
+                self.assertEqual(completed.returncode, 2)
+                self.assertNotIn("Traceback", completed.stderr)
+            completed = subprocess.run([sys.executable, "-B", "-m", "kora.errors", "--compare", str(base_path)],
+                                       cwd=ROOT, capture_output=True, text=True, timeout=30)
+            self.assertEqual(completed.returncode, 2)
+            self.assertIn("--compare requires --predictions", completed.stderr)
 
     def test_malformed_bundle_cli(self):
         arrays = self.bundle_arrays()

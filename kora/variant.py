@@ -8,6 +8,7 @@ Feature caches are keyed by a hash of the code and data that shape features (fea
 models/degrade_external.json, and the feature switches), so an edited file can never be scored from a
 stale cache. Stage-1 caches add the training switches.
 """
+import copy
 import hashlib
 import itertools
 import json
@@ -55,6 +56,17 @@ TRAIN_KEYS = ("balance",)
 # probabilities (kora.nested.fit_refiner, Y7a) instead of stage 1's.
 DECODER = {"inner_wins": 5, "plain_grid": None, "hsmm_grid": None, "refine": False}
 DETECTOR = {"ha_priority": False}
+
+
+def with_detector(base, **settings):
+    """A deep copy of variant `base` with detector settings merged in (RESEARCH.md V7 round 2).
+
+    Used to pin a candidate to an explicit base, e.g. VARIANTS["v7r2"] = with_detector("touch_bal",
+    ha_priority=True), so it never follows later changes of PRODUCTION.
+    """
+    config = copy.deepcopy(VARIANTS[base])
+    config["detector"] = {**config.get("detector", {}), **settings}
+    return config
 
 
 def _name():
