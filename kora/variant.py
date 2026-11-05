@@ -48,7 +48,7 @@ VARIANTS = {
     # Y7 confirmation: the same pipeline with seed 2028 for the degraded copies and stage 1.
     "mixed_s2028": {"touch": True, "balance": 0.5, "mixed": True, "seed": 2028},
 }
-PRODUCTION = "touch_bal"                              # Y6: R2 passed against B0 and R1
+PRODUCTION = "mixed"                                  # J6: mixed_rand 7/7 over b0_rand, mixed -0.0017 vs touch_bal (<= 0.01)
 FEATURE_KEYS = ("touch", "mixed", "eval_rand")
 TRAIN_KEYS = ("balance",)
 
