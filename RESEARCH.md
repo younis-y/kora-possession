@@ -232,7 +232,14 @@ Secondary, reported but not deciding: recall at IoU 0.5 under 1 s and 1-2 s, the
 **Deployment:** Y7a and Y8a are wired into `kora.run` and `kora.train` only if they pass. Y7c and
 Y8b are configuration only.
 
-**Outcome:** —
+**Outcome so far:** `y8a_dwell` did not meet the keep rule: mean spellF1 was 0.7492 versus
+0.7528 for `touch_bal`, with 3/7 matches improving. At IoU 0.5, recall for true possessions
+under 1 s rose from 103/384 (0.268) to 124/384 (0.323), while precision for predicted
+possessions under 1 s fell from 0.621 (169 predicted) to 0.565 (216 predicted). For predicted
+possessions of 1–2 s, precision fell from 0.670 to 0.615. The 1,000-draw paired-possession
+bootstrap (seed 0) gave a 5th–95th interval of −0.0104 to +0.0035 for spellF1 difference.
+The interval is descriptive and does not establish equivalence. Future work on short-possession
+recall should also preserve precision. The remaining Y7/Y8 outcomes are pending.
 
 ### [pending] Y10: Do cuts at detector peaks recover swallowed short possessions?
 
