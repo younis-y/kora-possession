@@ -334,9 +334,21 @@ peak within 5 frames of both edges, at the detector's number of false peaks for 
 **Passes** if the event model cuts out more swallowed spells at all three levels. If it fails,
 Y14 is not run.
 
-**Y14 (only if Y13 passes):** event probabilities used twice on top of `mixed`: as stage-1 columns
-(last / next event team and strength) and as cut anchors for `kora/cuts.py` in place of detector
-peaks, θ and gap chosen on the inner matches. **Y15:** ball gaps under 1 s with both ends seen are
+**Y13 gate result (2026-11-05):** PASSED. Of 470 swallowed spells, peaks within 5 frames of both
+edges at the detector's false-peak counts for θ = 0.3 / 0.4 / 0.5: detector 62 / 47 / 32, event model
+80 / 69 / 57 (event θ 0.10 / 0.15 / 0.21). The event model names the right team at 0.79 of the
+swallowed starts it scores. `models/gate_y13_mixed.json`.
+
+**Y14 (amended after the gate, before any outer score):** `y14_events` = `mixed` plus closed event
+pairs: a peak handing the ball to the other team, followed within `max_len` frames inside the same
+decoded run by a peak handing it back, relabels the frames between to the opening event's team.
+θ ∈ {0.1, 0.15, 0.2, 0.3, 0.4} and max_len ∈ {50, 100, 200} are chosen on the six inner matches (event
+models trained without m and k) and used on m only under the HSMM rule (inner mean up, >= 5 of 6).
+Two changes from the registration, both before any score: pieces take the event's team, not
+`kora/cuts.py`'s summed stage-1 probabilities, because the diagnosis shows stage 1 prefers the true
+team in only 16% of these spells; and the event columns are not fed to stage 1 here, since clean
+columns need a stage-1 refit per excluded set. `spell_f1_noevent` must equal `mixed` on every fold.
+**Y15:** ball gaps under 1 s with both ends seen are
 filled by straight lines, with a flag column, before features. Both are decided by
 `kora.compare mixed <v>` (mean up and >= 5 of 7 matches better) and checked on heavy-gap copies.
 

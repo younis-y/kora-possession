@@ -23,6 +23,7 @@ models/nested_<variant>_predictions.npz (schema-1 bundle for `kora.errors --pred
 Compare two variants with `python -m kora.compare b0 <variant>`.
 """
 import argparse
+import itertools
 import json
 import subprocess
 import time
@@ -32,7 +33,7 @@ import numpy as np
 from joblib import Parallel, delayed
 
 from .boundary import GRID, RAW, context, model as detector, runs_of, target
-from . import dwell, fill, peaks
+from . import dwell, events, fill, peaks
 from .cuts import relabel
 from . import train as _train
 from .data import cache_dir
@@ -40,7 +41,7 @@ from .decode import decode, decode_hsmm, log_duration
 from .external import MATCHES
 from .train import (FEATURE_VERSION, GRID_ALPHA, GRID_D, GRID_HA, MODELS, STAGE1_VERSION, SUBSAMPLE,
                     TRAIN_COPIES, copies, fit_classifier, segments_of)
-from .variant import CONFIG, NAME, VARIANTS, decoder, detector as detector_config
+from .variant import CONFIG, NAME, VARIANTS, _hash, decoder, detector as detector_config
 from .vendor import possession_metrics as pm
 
 warnings.filterwarnings("ignore", category=RuntimeWarning)
@@ -95,6 +96,35 @@ def mirrored_eval(match, X):
     if not np.array_equal(_train.build(p, d["team"], b, d["half"]).to_numpy(), X.to_numpy(), equal_nan=True):
         raise RuntimeError(f"{match}: replayed evaluation copy differs from the cache")
     return _train.build(*_train.mirror(p, d["team"], b), d["half"])
+
+
+def event_probs(data, y):
+    """Y14: touch-event probabilities on each evaluation copy, keyed (m, k) like stage 1: (m, m) from a
+    model trained without m, (m, k) from one trained without m and k. One model per excluded set
+    serves every match in it. Cached by feature key and events.py."""
+    from pathlib import Path
+    key = FEATURE_VERSION + "e" + _hash([Path(events.__file__).read_bytes(), str(_train.SEED)])[:10]
+    path = lambda m, k: cache_dir() / f"events_{key}_{k if m == k else k + '_x' + m}.npy"
+    sets = [(m,) for m in MATCHES] + list(itertools.combinations(MATCHES, 2))
+    todo = [ex for ex in sets if not all(path(m, k).exists() for m in ex for k in ex if len(ex) == 1 or m != k)]
+    if todo:
+        parts = {j: [events.rows(X, lab, data[j][1][2]) for X, lab in data[j][0]] for j in MATCHES}
+        ev = {k: (events.candidates(data[k][1][0]), len(y[k])) for k in MATCHES}
+        tabs = {k: events.table(data[k][1][0], ev[k][0]) for k in MATCHES}
+
+        def job(ex):
+            clf = events.fit_rows([r for j in MATCHES if j not in ex for r in parts[j]], _train.SEED)
+            return {k: events.place(clf, ev[k][1], ev[k][0], tabs[k]) for k in ex}
+        for ex, out in zip(todo, Parallel(n_jobs=len(MATCHES))(delayed(job)(ex) for ex in todo)):
+            for k, p in out.items():
+                for m in ex:
+                    if len(ex) == 1 or m != k:
+                        np.save(path(m, k), p)
+    return {(m, k): np.load(path(m, k)) for m in MATCHES for k in MATCHES}
+
+
+def event_scores(paths, E, y, half, theta, max_len):
+    return [scores(y[k], events.relabel(paths[k], E[k], half[k], theta, max_len), half[k])["mean_f1"] for k in paths]
 
 
 def fit_detector(ctx, tgt, train, test):
@@ -157,6 +187,9 @@ def main():
     raw = {m: data[m][1][0][RAW] for m in MATCHES}
     seen = {m: data[m][1][0]["b_seen"].to_numpy().astype(np.int8) for m in MATCHES}
     labels = {m: np.concatenate([lab[::SUBSAMPLE] for _, lab in data[m][0]]) for m in MATCHES}
+    E = event_probs(data, y) if DECODER["events"] else None
+    if E is not None:
+        print(f"event models done ({time.time() - t0:.0f} s)", flush=True)
     tgt = {m: target(y[m], half[m], **DETECTOR_CFG) for m in MATCHES}
 
     # 1. stage-1 predictions: outer (kora.train folds) and inner (without m and k)
@@ -208,10 +241,11 @@ def main():
         pred_hsmm = decode_hsmm(outer[m], change[m, m], seg, prior, ld, *HSMM[bh][:4], rate, *HSMM[bh][4:])
         pred = pred_hsmm if keep else pred_plain
         s_nocut, cut = scores(y[m], pred, half[m]), {"theta": None, "gap": None}
-        if DECODER["cuts"]:                                            # Y10: cut at detector peaks (kora/cuts.py)
+        if DECODER["cuts"] or DECODER["events"]:
             paths = (hsmm_paths(P, C, yi, hi, prior, rate, HSMM[bh]) if keep else
                      {k: decode(P[k], segments_of(half[k]), prior, *PLAIN[bp]) for k in ins})
             off = np.array([scores(y[k], paths[k], half[k])["mean_f1"] for k in ins])
+        if DECODER["cuts"]:                                            # Y10: cut at detector peaks (kora/cuts.py)
             grid = [(t, g) for t in DECODER["cuts"]["theta"] for g in DECODER["cuts"]["gap"]]
             cs = np.array(Parallel(n_jobs=-1)(delayed(cut_scores)(paths, P, C, yi, hi, t, g) for t, g in grid))
             bc = int(cs.mean(1).argmax())
@@ -219,6 +253,16 @@ def main():
             if cs[bc].mean() > off.mean() and (cs[bc] > off).sum() >= INNER_WINS:   # same rule as the HSMM
                 cut.update(theta=grid[bc][0], gap=grid[bc][1])
                 pred = relabel(pred, outer[m], change[m, m], half[m], *grid[bc])
+        s_noevent, evsel = scores(y[m], pred, half[m]), {"theta": None, "max_len": None}
+        if DECODER["events"]:                                          # Y14: closed event pairs (kora/events.py)
+            grid = [(t, n) for t in DECODER["events"]["theta"] for n in DECODER["events"]["max_len"]]
+            es = np.array(Parallel(n_jobs=-1)(delayed(event_scores)(paths, {k: E[m, k] for k in ins}, yi, hi, t, n)
+                                              for t, n in grid))
+            be = int(es.mean(1).argmax())
+            evsel.update(inner_mean=float(es[be].mean()), inner_mean_off=float(off.mean()))
+            if es[be].mean() > off.mean() and (es[be] > off).sum() >= INNER_WINS:   # same rule as the HSMM
+                evsel.update(theta=grid[be][0], max_len=grid[be][1])
+                pred = events.relabel(pred, E[m, m], half[m], *grid[be])
         s, s_plain, s_hsmm = scores(y[m], pred, half[m]), scores(y[m], pred_plain, half[m]), scores(y[m], pred_hsmm, half[m])
         folds[m] = {
             "inner_matches": ins, "decoder": "hsmm" if keep else "plain",
@@ -230,6 +274,7 @@ def main():
             "n_true": s["n_gt"], "n_pred": s["n_pred"],
             "spell_f1_plain": s_plain["mean_f1"], "spell_f1_hsmm": s_hsmm["mean_f1"],
             "spell_f1_nocut": s_nocut["mean_f1"], "cuts": cut,
+            "spell_f1_noevent": s_noevent["mean_f1"], "events": evsel,
         }
         bundle.update({f"{m}__y_true": y[m].astype(np.int8), f"{m}__y_pred": pred.astype(np.int8),
                        f"{m}__half": half[m], f"{m}__ball_seen": seen[m], f"{m}__frame": np.arange(len(pred))})

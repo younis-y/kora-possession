@@ -26,6 +26,7 @@ from joblib import Parallel, delayed
 from sklearn.ensemble import HistGradientBoostingClassifier
 
 from .boundary import RADIUS
+from .cuts import peaks
 from .features import CAP_S, FPS
 from .touch import TOUCH_DV
 
@@ -48,7 +49,7 @@ def candidates(X):
 def table(X, idx):
     """One row per candidate frame."""
     n = len(X)
-    f = {c: X[c].to_numpy()[idx] for c in X.columns}
+    f = {str(c): X[c].to_numpy()[idx] for c in X.columns}
     for c in KIN:
         v = X[c].to_numpy()
         for s in SHIFTS:
@@ -82,26 +83,55 @@ def model(seed):
                                           n_iter_no_change=25, random_state=seed)
 
 
+def rows(X, y, half):
+    """(candidate frames, their feature table, their labels) for one copy."""
+    idx = candidates(X)
+    return idx, table(X, idx), labels(y, half, idx)
+
+
+def fit_rows(parts, seed):
+    """Event model from [(idx, table, labels)] of labelled copies."""
+    return model(seed).fit(pd.concat([t for _, t, _ in parts], ignore_index=True),
+                           np.concatenate([lab for _, _, lab in parts]))
+
+
 def fit(copies, seed):
     """Event model from [(X, y, half)] copies with labels."""
-    rows, labs = [], []
-    for X, y, half in copies:
-        idx = candidates(X)
-        rows.append(table(X, idx))
-        labs.append(labels(y, half, idx))
-    return model(seed).fit(pd.concat(rows, ignore_index=True), np.concatenate(labs))
+    return fit_rows([rows(X, y, half) for X, y, half in copies], seed)
 
 
-def frames(clf, X):
-    """(n, 2) per-frame probabilities of a handover into H / A at candidate frames, 0 elsewhere."""
-    idx = candidates(X)
-    out = np.zeros((len(X), 2), np.float32)
+def place(clf, n, idx, tab):
+    """(n, 2) per-frame probabilities of a handover into H / A at the candidates idx, 0 elsewhere."""
+    out = np.zeros((n, 2), np.float32)
     if len(idx):
-        p = clf.predict_proba(table(X, idx))
+        p = clf.predict_proba(tab)
         cls = list(clf.classes_)
         for j, k in enumerate((1, 2)):
             if k in cls:
                 out[idx, j] = p[:, cls.index(k)]
+    return out
+
+
+def frames(clf, X):
+    idx = candidates(X)
+    return place(clf, len(X), idx, table(X, idx))
+
+
+def relabel(path, ev, half, theta, max_len):
+    """Y14: `path` (0 H, 1 A, 2 D) with each closed pair of event peaks inside one team's run relabelled.
+
+    A peak opening a handover into the other team followed, within max_len frames and inside the same
+    run, by a peak handing it back marks a possession the decoder swallowed; the frames between take
+    the opening event's team. Unpaired peaks and dead-ball runs change nothing."""
+    pk = peaks(ev.sum(1), theta, 2 * RADIUS + 2)
+    team = ev[pk].argmax(1)
+    out = path.copy()
+    for i in range(len(pk) - 1):
+        a, b = pk[i], pk[i + 1]
+        run = path[a]
+        if (run < 2 and b - a <= max_len and half[a] == half[b] and (path[a:b] == run).all()
+                and team[i] == 1 - run and team[i + 1] == run):
+            out[a:b] = team[i]
     return out
 
 
@@ -115,7 +145,6 @@ def swallowed(y, pred):
 
 def hits(score, theta, truth, sw):
     """(false peaks, swallowed spells with a peak within RADIUS of both their start and their stop)."""
-    from .cuts import peaks
     pk = peaks(score, theta, 2 * RADIUS + 2)
     if not len(pk):
         return 0, 0
@@ -167,8 +196,9 @@ def gate():
         t_e, f_e, b_e = max(ok, key=lambda r: (r[2], -r[1])) if ok else (None, 0, 0)
         print(f"  {theta:.2f}          {f_d:6d}       {b_d:4d} ({b_d / n_sw:.2f})      |  {t_e}        {f_e:6d}     "
               f"{b_e:4d} ({b_e / n_sw:.2f})")
-        out["levels"].append({"detector_theta": theta, "detector_false": f_d, "detector_cut": b_d,
-                              "event_theta": t_e, "event_false": f_e, "event_cut": b_e})
+        out["levels"].append({"detector_theta": theta, "detector_false": int(f_d), "detector_cut": int(b_d),
+                              "event_theta": None if t_e is None else float(t_e), "event_false": int(f_e),
+                              "event_cut": int(b_e)})
     team = []
     for m in MATCHES:
         for a, _ in sw[m]:
@@ -176,7 +206,7 @@ def gate():
             if w.max() > 0:
                 team.append(int(np.unravel_index(w.argmax(), w.shape)[1]) == int(y[m][a]))
     out["event_team_right"] = float(np.mean(team)) if team else None
-    out["passed"] = all(l["event_cut"] > l["detector_cut"] for l in out["levels"])
+    out["passed"] = bool(all(l["event_cut"] > l["detector_cut"] for l in out["levels"]))
     print(f"event model names the right team at {out['event_team_right']:.2f} of swallowed starts it scores")
     print("GATE " + ("PASSED" if out["passed"] else "FAILED") + " (event model cuts out more swallowed spells at all three levels)")
     (nested.MODELS / f"gate_y13_{nested.NAME}.json").write_text(json.dumps(out, indent=2))

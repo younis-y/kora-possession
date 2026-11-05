@@ -56,6 +56,10 @@ VARIANTS = {
     "mixed_s2028": {"touch": True, "balance": 0.5, "mixed": True, "seed": 2028},
     # RESEARCH.md Y15 (pre-registered 2026-11-05): production + short ball gaps filled (kora/fill.py),
     # on normal and on heavy-gap evaluation copies (the latter compared with mixed_rand).
+    # RESEARCH.md Y14 (amended 2026-11-05 after the Y13 gate, before any outer score): production + closed
+    # pairs of touch-event peaks relabelled to the opening event's team (kora/events.py).
+    "y14_events": {"touch": True, "balance": 0.5, "mixed": True,
+                   "decoder": {"events": {"theta": [0.1, 0.15, 0.2, 0.3, 0.4], "max_len": [50, 100, 200]}}},
     "y15_fill": {"touch": True, "balance": 0.5, "mixed": True, "fill": True},
     "y15_fill_rand": {"touch": True, "balance": 0.5, "mixed": True, "eval_rand": True, "fill": True},
 }
@@ -68,7 +72,7 @@ TRAIN_KEYS = ("balance",)
 # beta); None means the default grids (kora.train GRID_*, kora.boundary GRID). refine: decode stage-2
 # probabilities (kora.nested.fit_refiner, Y7a) instead of stage 1's. cuts: {"theta": [...], "gap": [...]}
 # grid for boundary-cut relabelling (kora/cuts.py, Y10), chosen in the inner folds; None = off.
-DECODER = {"inner_wins": 5, "plain_grid": None, "hsmm_grid": None, "refine": False, "cuts": None}
+DECODER = {"inner_wins": 5, "plain_grid": None, "hsmm_grid": None, "refine": False, "cuts": None, "events": None}
 DETECTOR = {"ha_priority": False}
 
 

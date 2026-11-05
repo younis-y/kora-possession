@@ -51,6 +51,19 @@ class EventTests(unittest.TestCase):
         self.assertGreater(p[50, 0], p[50, 1])
         self.assertGreater(p[120, 1], p[120, 0])
 
+    def test_relabel_cuts_out_closed_pairs_only(self):
+        path = np.zeros(300, int)
+        path[250:] = 2
+        half = np.ones(300, int)
+        ev = np.zeros((300, 2), np.float32)
+        ev[100, 1], ev[130, 0] = 0.6, 0.5          # into A, back to H: swallowed A spell
+        ev[180, 1] = 0.7                           # into A, never handed back: unpaired
+        out = events.relabel(path, ev, half, theta=0.3, max_len=50)
+        np.testing.assert_array_equal(np.flatnonzero(out != path), np.arange(100, 130))
+        self.assertTrue((out[100:130] == 1).all())
+        np.testing.assert_array_equal(events.relabel(path, ev, half, theta=0.3, max_len=20), path)   # too long
+        np.testing.assert_array_equal(events.relabel(path, ev, half, theta=0.65, max_len=50), path)  # below theta
+
 
 class CeilingTests(unittest.TestCase):
     def test_swallowed_oracle_restores_only_the_swallowed_spell(self):
