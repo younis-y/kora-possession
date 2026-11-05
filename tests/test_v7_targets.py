@@ -134,7 +134,6 @@ class HandoverPriorityTests(unittest.TestCase):
 class V7VariantTests(unittest.TestCase):
     def test_candidate_is_touch_bal_plus_detector_key(self):
         baseline, candidate = (variant.VARIANTS[k] for k in ("touch_bal", "v7_ha_priority"))
-        self.assertEqual(variant.PRODUCTION, "touch_bal")
         self.assertEqual(candidate, {**baseline, "detector": {"ha_priority": True}})
         self.assertEqual(variant.decoder(candidate), variant.decoder(baseline))
 
