@@ -32,7 +32,7 @@ import numpy as np
 from joblib import Parallel, delayed
 
 from .boundary import GRID, RAW, context, model as detector, runs_of, target
-from . import dwell, peaks
+from . import dwell, fill, peaks
 from .cuts import relabel
 from . import train as _train
 from .data import cache_dir
@@ -139,6 +139,8 @@ def main():
     parser.parse_args()
     if CONFIG.get("seed"):             # read at call time by kora.train (copies, classifier)
         _train.SEED = CONFIG["seed"]
+    if CONFIG.get("fill"):             # Y15: kora.train builds every copy through this (train.py unchanged, keys kept)
+        _train.build = fill.wrap(_train.build)
     t0 = time.time()
     print(f"variant {NAME} {CONFIG}  features {FEATURE_VERSION}  stage 1 {STAGE1_VERSION}", flush=True)
     data = {m: copies(m) for m in MATCHES}

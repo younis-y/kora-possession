@@ -54,6 +54,10 @@ VARIANTS = {
     "y12_peaks": {"touch": True, "balance": 0.5, "mixed": True, "peaks": True},
     # Y7 confirmation: the same pipeline with seed 2028 for the degraded copies and stage 1.
     "mixed_s2028": {"touch": True, "balance": 0.5, "mixed": True, "seed": 2028},
+    # RESEARCH.md Y15 (pre-registered 2026-11-05): production + short ball gaps filled (kora/fill.py),
+    # on normal and on heavy-gap evaluation copies (the latter compared with mixed_rand).
+    "y15_fill": {"touch": True, "balance": 0.5, "mixed": True, "fill": True},
+    "y15_fill_rand": {"touch": True, "balance": 0.5, "mixed": True, "eval_rand": True, "fill": True},
 }
 PRODUCTION = "mixed"                                  # J6: mixed_rand 7/7 over b0_rand, mixed -0.0017 vs touch_bal (<= 0.01)
 FEATURE_KEYS = ("touch", "mixed", "eval_rand")
@@ -109,6 +113,9 @@ def feature_version(config=CONFIG):
     switches = json.dumps({k: config.get(k) for k in FEATURE_KEYS}, sort_keys=True)
     if config.get("seed"):             # added later: keyed only when set, so older caches keep their names
         switches += f"seed{config['seed']}"
+    if config.get("fill"):             # Y15, same
+        files.append(ROOT / "kora" / "fill.py")
+        switches += "fill"
     return "f" + _hash([f.read_bytes() for f in files] + [switches])
 
 
