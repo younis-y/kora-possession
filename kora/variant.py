@@ -45,6 +45,9 @@ VARIANTS = {
     "y7c_wide": {"touch": True, "balance": 0.5, "decoder": {"hsmm_grid": V5_HSMM_GRID}},
     "y8a_dwell": {"touch": True, "balance": 0.5, "dwell": True},                    # kora/dwell.py
     "y8b_bal1": {"touch": True, "balance": 1.0},
+    # RESEARCH.md Y10 (pre-registered 2026-11-05): production + boundary cuts at detector peaks.
+    "y10_cuts": {"touch": True, "balance": 0.5, "mixed": True,
+                 "decoder": {"cuts": {"theta": [0.2, 0.3, 0.4, 0.5, 0.6], "gap": [6, 12, 25]}}},
     # Y7 confirmation: the same pipeline with seed 2028 for the degraded copies and stage 1.
     "mixed_s2028": {"touch": True, "balance": 0.5, "mixed": True, "seed": 2028},
 }
@@ -55,8 +58,9 @@ TRAIN_KEYS = ("balance",)
 # Decoder selection in kora.nested. A variant overrides any key under "decoder"; nothing here touches the
 # stage-1 caches. Grids are lists of tuples: plain (alpha, cost_ha, cost_d), hsmm (cost_ha, cost_d, w_dur,
 # beta); None means the default grids (kora.train GRID_*, kora.boundary GRID). refine: decode stage-2
-# probabilities (kora.nested.fit_refiner, Y7a) instead of stage 1's.
-DECODER = {"inner_wins": 5, "plain_grid": None, "hsmm_grid": None, "refine": False}
+# probabilities (kora.nested.fit_refiner, Y7a) instead of stage 1's. cuts: {"theta": [...], "gap": [...]}
+# grid for boundary-cut relabelling (kora/cuts.py, Y10), chosen in the inner folds; None = off.
+DECODER = {"inner_wins": 5, "plain_grid": None, "hsmm_grid": None, "refine": False, "cuts": None}
 DETECTOR = {"ha_priority": False}
 
 

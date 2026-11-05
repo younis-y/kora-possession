@@ -234,6 +234,38 @@ Y8b are configuration only.
 
 **Outcome:** —
 
+### [pending] Y10: Do cuts at detector peaks recover swallowed short possessions?
+
+**Hypothesis:** every decoder pays the same switching cost for a 0.5 s possession as for a 30 s one,
+so short possessions inside the other team's spell are swallowed. 48% of R2's misses are covered
+mostly by the other team (V1, PR #11), and Y7's refiner and wider grid made this worse or did not
+help. ASRF (Ishikawa et al., WACV 2021, arXiv 2007.06866) recovers short segments by cutting the
+decoded path where a boundary detector peaks and relabelling each piece by its frame
+probabilities. On 50Salads that took F1@50 from 66.7 to 77.3 over the same model without it.
+
+**Candidate (pre-registered 2026-11-05, before any outer score):** `y10_cuts` is production (`mixed`)
+plus `kora/cuts.py`:
+
+- Peaks are local maxima of the existing detector's team-change probability at or above θ, at least
+  `gap` frames apart.
+- Every H/A run of the selected decoder's path is cut at the peaks inside it.
+- Each piece takes H or A by its summed stage-1 probabilities. Dead-ball runs are untouched.
+- θ ∈ {0.2, 0.3, 0.4, 0.5, 0.6} and gap ∈ {6, 12, 25} frames are chosen on the six inner matches.
+- Cuts are used on the outer match only if they beat no cuts on the inner mean and on at least 5 of
+  6 inner matches, the same rule as the HSMM.
+- Stage 1 and the detector are reused from `mixed`.
+- The JSON records `spell_f1_nocut`, which must equal `mixed` on every fold. That is the pairing check.
+
+**Decision rule:** `python -m kora.compare mixed y10_cuts`. Keep if the mean spellF1 is higher and at
+least 5 of 7 matches improve strictly.
+
+Secondary, reported but not deciding: recall and precision for possessions under 2 s, which must
+both rise for a follow-up; the count ratio; and `kora.errors --compare` intervals.
+
+**Deployment** (`kora.run` with the all-7 detector) is added only if Y10 passes.
+
+**Outcome:** —
+
 ## Vladymyr — error metrics and decoder
 
 ### [verified] V1: Are possessions merged, split, or miscounted?

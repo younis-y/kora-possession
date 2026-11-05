@@ -33,6 +33,7 @@ from joblib import Parallel, delayed
 
 from .boundary import GRID, RAW, context, model as detector, runs_of, target
 from . import dwell
+from .cuts import relabel
 from . import train as _train
 from .data import cache_dir
 from .decode import decode, decode_hsmm, log_duration
@@ -87,13 +88,23 @@ def plain_scores(P, y, half, prior, setting):
     return [scores(y[k], decode(P[k], segments_of(half[k]), prior, *setting), half[k])["mean_f1"] for k in P]
 
 
-def hsmm_scores(P, C, y, half, prior, rate, setting):
-    out = []
+def hsmm_paths(P, C, y, half, prior, rate, setting):
+    """HSMM path on each inner match, its duration prior from the other inner matches."""
+    out = {}
     for k in P:
         ld = log_duration([r for j in P if j != k for r in runs_of(y[j], half[j])])
-        out.append(scores(y[k], decode_hsmm(P[k], C[k], segments_of(half[k]), prior, ld,
-                                         *setting[:4], rate, *setting[4:]), half[k])["mean_f1"])
+        out[k] = decode_hsmm(P[k], C[k], segments_of(half[k]), prior, ld,
+                             *setting[:4], rate, *setting[4:])
     return out
+
+
+def hsmm_scores(P, C, y, half, prior, rate, setting):
+    paths = hsmm_paths(P, C, y, half, prior, rate, setting)
+    return [scores(y[k], paths[k], half[k])["mean_f1"] for k in P]
+
+
+def cut_scores(paths, P, C, y, half, theta, gap):
+    return [scores(y[k], relabel(paths[k], P[k], C[k], half[k], theta, gap), half[k])["mean_f1"] for k in paths]
 
 
 def main():
@@ -162,6 +173,18 @@ def main():
         pred_plain = decode(outer[m], seg, prior, *PLAIN[bp])
         pred_hsmm = decode_hsmm(outer[m], change[m, m], seg, prior, ld, *HSMM[bh][:4], rate, *HSMM[bh][4:])
         pred = pred_hsmm if keep else pred_plain
+        s_nocut, cut = scores(y[m], pred, half[m]), {"theta": None, "gap": None}
+        if DECODER["cuts"]:                                            # Y10: cut at detector peaks (kora/cuts.py)
+            paths = (hsmm_paths(P, C, yi, hi, prior, rate, HSMM[bh]) if keep else
+                     {k: decode(P[k], segments_of(half[k]), prior, *PLAIN[bp]) for k in ins})
+            off = np.array([scores(y[k], paths[k], half[k])["mean_f1"] for k in ins])
+            grid = [(t, g) for t in DECODER["cuts"]["theta"] for g in DECODER["cuts"]["gap"]]
+            cs = np.array(Parallel(n_jobs=-1)(delayed(cut_scores)(paths, P, C, yi, hi, t, g) for t, g in grid))
+            bc = int(cs.mean(1).argmax())
+            cut.update(inner_mean=float(cs[bc].mean()), inner_mean_off=float(off.mean()))
+            if cs[bc].mean() > off.mean() and (cs[bc] > off).sum() >= INNER_WINS:   # same rule as the HSMM
+                cut.update(theta=grid[bc][0], gap=grid[bc][1])
+                pred = relabel(pred, outer[m], change[m, m], half[m], *grid[bc])
         s, s_plain, s_hsmm = scores(y[m], pred, half[m]), scores(y[m], pred_plain, half[m]), scores(y[m], pred_hsmm, half[m])
         folds[m] = {
             "inner_matches": ins, "decoder": "hsmm" if keep else "plain",
@@ -172,6 +195,7 @@ def main():
             "spell_f1": s["mean_f1"], "spell_f1_per_iou": {str(t): v["f1"] for t, v in s["per_iou"].items()},
             "n_true": s["n_gt"], "n_pred": s["n_pred"],
             "spell_f1_plain": s_plain["mean_f1"], "spell_f1_hsmm": s_hsmm["mean_f1"],
+            "spell_f1_nocut": s_nocut["mean_f1"], "cuts": cut,
         }
         bundle.update({f"{m}__y_true": y[m].astype(np.int8), f"{m}__y_pred": pred.astype(np.int8),
                        f"{m}__half": half[m], f"{m}__ball_seen": seen[m], f"{m}__frame": np.arange(len(pred))})
@@ -193,6 +217,7 @@ def main():
     summary = {**meta, "spell_f1_mean": float(f1.mean()), "spell_f1_std": float(f1.std()),
                "spell_f1_plain_mean": float(np.mean([folds[m]["spell_f1_plain"] for m in MATCHES])),
                "spell_f1_hsmm_mean": float(np.mean([folds[m]["spell_f1_hsmm"] for m in MATCHES])),
+               "spell_f1_nocut_mean": float(np.mean([folds[m]["spell_f1_nocut"] for m in MATCHES])),
                "folds": folds}
     (MODELS / f"nested_{NAME}.json").write_text(json.dumps(summary, indent=2))
     np.savez_compressed(MODELS / f"nested_{NAME}_predictions.npz", meta=json.dumps(meta), **bundle)
