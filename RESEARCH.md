@@ -305,6 +305,43 @@ Secondary: recall and precision under 2 s, the count ratio, and `kora.errors --c
 
 **Outcome:** —
 
+### [pending] Y13-Y15: Can a touch-event model find the possessions the frame model swallows?
+
+**Diagnosis (2026-11-05, `python -m kora.ceiling mixed mixed_rand`, held-out predictions of production).**
+spellF1 if one error type were fixed perfectly:
+
+| Fixed perfectly | `mixed` | `mixed_rand` (heavy gaps) |
+|---|---|---|
+| nothing | 0.7511 | 0.6607 |
+| swallowed spells (true H/A spell covered on < half its frames) | 0.9183 | 0.8881 |
+| spells under 2 s | 0.8608 | 0.8046 |
+| edges within 0.5 s of a predicted change | 0.7663 | 0.6827 |
+
+Inside the 470 swallowed spells (ball visible 99% of the time) stage 1 prefers the true team on at
+least half the frames in 16%; the true team reaches P >= 0.5 in 56%, but the other team does so in
+59% of long spells production holds correctly. So the frame classifier's signal for these spells is
+no stronger than its noise, which is why decoder changes (V5-V7, Y7, Y10) moved the score by < 0.005,
+and timing is worth at most +0.015.
+
+**Y13 gate (pre-registered 2026-11-05, before it ran).** `kora/events.py`: candidates are local maxima
+of the ball's velocity change `b_acc` (+-2 frames, >= 0.2 x 2.7 m/s); each gets the feature row at
+the candidate, the change of 15 kinematic columns 3 and 6 frames either side, and the gap to and
+strength of the neighbouring candidates; label = an H<->A handover into H / A within 5 frames. A
+gradient-boosted model per held-out match m is trained on the other six matches' training copies
+(ballradar, KDD 2023; ELASTIC, arXiv 2508.09238). `python -m kora.events` fits it and m's outer
+change detector exactly as `kora.nested` does, then counts swallowed spells of production with a
+peak within 5 frames of both edges, at the detector's number of false peaks for θ = 0.3, 0.4, 0.5.
+**Passes** if the event model cuts out more swallowed spells at all three levels. If it fails,
+Y14 is not run.
+
+**Y14 (only if Y13 passes):** event probabilities used twice on top of `mixed`: as stage-1 columns
+(last / next event team and strength) and as cut anchors for `kora/cuts.py` in place of detector
+peaks, θ and gap chosen on the inner matches. **Y15:** ball gaps under 1 s with both ends seen are
+filled by straight lines, with a flag column, before features. Both are decided by
+`kora.compare mixed <v>` (mean up and >= 5 of 7 matches better) and checked on heavy-gap copies.
+
+**Outcome:** —
+
 ## Vladymyr — error metrics and decoder
 
 ### [verified] V1: Are possessions merged, split, or miscounted?
