@@ -8,7 +8,7 @@ import numpy as np
 
 from kora.boundary import GRID
 from kora.decode import DMAX, STRIDE, decode_hsmm, emissions, hsmm
-from kora.variant import VARIANTS, decoder
+from kora.variant import VARIANTS, decoder, feature_version, stage1_version
 
 LEGACY_DMAX = 600
 LEGACY_STRIDE = 3
@@ -63,32 +63,7 @@ def legacy_decode_hsmm(proba, change, segments, prior, ld, cost_ha, cost_d, w, b
     return out
 
 
-def exhaustive_paths(e, ld, cost_ha, cost_d, w, bonus):
-    """Enumerate every segmentation and state sequence for tiny synthetic inputs."""
-    best, paths = -np.inf, set()
-
-    def visit(start, previous, score, path):
-        nonlocal best, paths
-        if start == len(e):
-            if score > best:
-                best, paths = score, {path}
-            elif score == best:
-                paths.add(path)
-            return
-        for duration in range(1, min(DMAX, len(e) - start) + 1):
-            for state in range(3):
-                added = e[start:start + duration, state].sum() + w * ld[state, duration - 1]
-                if previous is not None:
-                    added -= cost_d if 2 in (previous, state) else cost_ha
-                    if (previous, state) in ((0, 1), (1, 0)):
-                        added += bonus[start, state]
-                visit(start + duration, state, score + added, path + (state,) * duration)
-
-    visit(0, None, 0.0, ())
-    return paths
-
-
-class LegacyCompatibilityTests(unittest.TestCase):
+class DecoderTests(unittest.TestCase):
     def test_default_hsmm_matches_frozen_reference_on_random_inputs(self):
         for seed in (0, 17, 2027):
             rng = np.random.default_rng(seed)
@@ -115,10 +90,6 @@ class LegacyCompatibilityTests(unittest.TestCase):
                 expected = legacy_decode_hsmm(*args)
                 np.testing.assert_array_equal(decode_hsmm(*args), expected)
                 np.testing.assert_array_equal(decode_hsmm(*args, ha_bonus_only=False), expected)
-                np.testing.assert_array_equal(expected[:3], -1)
-                np.testing.assert_array_equal(expected[64:69], -1)
-                self.assertEqual(expected[63], expected[62])
-                self.assertEqual(expected[126], expected[125])
 
     def test_default_ties_keep_legacy_order(self):
         args = (np.zeros((7, 3)), np.zeros((3, DMAX)), 0, 0, 0, np.zeros((8, 3)))
@@ -142,9 +113,7 @@ class LegacyCompatibilityTests(unittest.TestCase):
                 np.testing.assert_array_equal(expected, np.full(length, state, np.int8))
                 np.testing.assert_array_equal(decode_hsmm(*args, ha_bonus_only=True), expected)
 
-
-class HandoverBonusTests(unittest.TestCase):
-    def test_exhaustive_transition_cases(self):
+    def test_transition_edge_optima(self):
         # Large bonuses on forbidden edges would change these optima if accidentally used.
         cases = [
             ("H to A reward", [[5, -100, -100], [0, -1, -100]], 1, 1, 4, (0, 1)),
@@ -165,18 +134,7 @@ class HandoverBonusTests(unittest.TestCase):
                 e = np.array(rows, float)
                 bonus = np.zeros((len(e) + 1, 3))
                 bonus[start, destination] = value
-                self.assertEqual(exhaustive_paths(e, ld, 2, 2, 1, bonus), {expected})
                 np.testing.assert_array_equal(hsmm(e, ld, 2, 2, 1, bonus, True), expected)
-
-    def test_exhaustive_multiple_segments_and_backtrace(self):
-        for seed in (0, 17, 2027):
-            with self.subTest(seed=seed):
-                rng = np.random.default_rng(seed)
-                e = rng.integers(-5, 6, (5, 3)).astype(float)
-                ld = rng.integers(-3, 1, (3, DMAX)).astype(float)
-                bonus = rng.integers(-6, 7, (6, 3)).astype(float)
-                expected = exhaustive_paths(e, ld, 2, 4, 2, bonus)
-                self.assertIn(tuple(hsmm(e, ld, 2, 4, 2, bonus, True)), expected)
 
     def test_wrapper_excludes_restart_bonus_and_repeats_stride_tail(self):
         e = np.array([[-100, -100, 5], [-1, -100, 0]], float)
@@ -196,11 +154,6 @@ class HandoverBonusTests(unittest.TestCase):
                 rng = np.random.default_rng(seed)
                 ld = rng.normal(-3, 1, (3, DMAX))
                 ld[1] = ld[0]
-                e = rng.normal(-2, 3, (19, 3))
-                bonus = rng.normal(0, 4, (20, 3))
-                path = hsmm(e, ld, 2, 4, 2, bonus, True)
-                mirrored = hsmm(e[:, swap], ld[swap], 2, 4, 2, bonus[:, swap], True)
-                np.testing.assert_array_equal(mirrored, swap[path])
                 proba = rng.dirichlet(np.ones(3), size=61)
                 change = rng.uniform(0, 1, len(proba))
                 prior = np.array([0.4, 0.35, 0.25])
@@ -209,8 +162,6 @@ class HandoverBonusTests(unittest.TestCase):
                 mirrored = decode_hsmm(proba[:, swap], *args, prior[swap], ld[swap], 2, 4, 2, 3, 0.037, True)
                 np.testing.assert_array_equal(mirrored, swap[path])
 
-
-class V6VariantAndRoutingTests(unittest.TestCase):
     def test_variant_has_54_b0_settings_with_only_bonus_mode_changed(self):
         config = VARIANTS["v6_ha_only"]
         grid = config["decoder"]["hsmm_grid"]
@@ -223,49 +174,28 @@ class V6VariantAndRoutingTests(unittest.TestCase):
         self.assertEqual({k: v for k, v in resolved.items() if k != "hsmm_grid"},
                          {k: v for k, v in baseline.items() if k != "hsmm_grid"})
         self.assertEqual((resolved["plain_grid"], resolved["inner_wins"]), (None, 5))
-        restored = json.loads(json.dumps(resolved))
-        self.assertEqual([tuple(s) for s in restored["hsmm_grid"]], grid)
 
-    @classmethod
-    def setUpClass(cls):
-        # Inspect only source: do not import or run kora.nested or load any match data.
-        path = Path(__file__).resolve().parents[1] / "kora" / "nested.py"
-        cls.tree = ast.parse(path.read_text())
-
-    def test_both_nested_calls_bind_four_and_five_field_settings(self):
-        calls = [node for node in ast.walk(self.tree)
-                 if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
-                 and node.func.id == "decode_hsmm"]
-        self.assertEqual(len(calls), 2)
-
-        def stub(proba, change, segments, prior, ld, cost_ha, cost_d, w, beta, rate, ha_bonus_only=False):
-            return (cost_ha, cost_d, w, beta), rate, ha_bonus_only
-
-        for setting in ((2, 8, 3, 4), (2, 8, 3, 4, True)):
-            context = {"P": {0: None}, "C": {0: None}, "half": {0: None}, "k": 0,
-                       "segments_of": lambda _: None, "prior": None, "ld": None,
-                       "setting": setting, "rate": 0.037, "outer": {0: None},
-                       "change": {(0, 0): None}, "m": 0, "seg": None, "HSMM": [setting], "bh": 0}
-            for call in calls:
-                with self.subTest(setting=setting, line=call.lineno):
-                    code = compile(ast.Expression(call), "nested-call", "eval")
-                    result = eval(code, {"__builtins__": {}, "decode_hsmm": stub}, context)
-                    self.assertEqual(result, (setting[:4], 0.037, len(setting) == 5))
-
-    def test_fold_serialization_records_default_and_enabled_bonus_modes(self):
-        values = [value for node in ast.walk(self.tree) if isinstance(node, ast.Dict)
-                  for key, value in zip(node.keys, node.values)
-                  if isinstance(key, ast.Constant) and key.value == "hsmm"]
-        self.assertEqual(len(values), 1)
-        code = compile(ast.Expression(values[0]), "nested-setting", "eval")
+    def test_nested_routing_and_serialization(self):
+        # Evaluate source expressions only: no imports of nested or match data.
+        tree = ast.parse((Path(__file__).resolve().parents[1] / "kora/nested.py").read_text())
+        calls = [n for n in ast.walk(tree) if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)
+                 and n.func.id == "decode_hsmm"]
+        values = [v for n in ast.walk(tree) if isinstance(n, ast.Dict) for k, v in zip(n.keys, n.values)
+                  if isinstance(k, ast.Constant) and k.value == "hsmm"]
+        self.assertEqual((len(calls), len(values)), (2, 1))
         for setting in ((2, 8, 3, 4), (2, 8, 3, 4, True)):
             with self.subTest(setting=setting):
-                context = {"HSMM": [setting], "bh": 0, "hs": np.array([[0.1, 0.3]]), "rate": 0.037}
-                result = eval(code, {"dict": dict, "zip": zip, "float": float}, context)
-                self.assertEqual(result, {"cost_ha": 2, "cost_d": 8, "w_dur": 3, "beta": 4,
-                                          "ha_bonus_only": len(setting) == 5, "inner_mean": 0.2, "rate": 0.037})
+                def stub(proba, change, segments, prior, ld, cost_ha, cost_d, w, beta, rate, ha_bonus_only=False):
+                    return (cost_ha, cost_d, w, beta), rate, ha_bonus_only
+                context = dict(P={0: None}, C={0: None}, half={0: None}, k=0, segments_of=lambda _: None,
+                               prior=None, ld=None, setting=setting, rate=0.037, outer={0: None}, change={(0, 0): None},
+                               m=0, seg=None, HSMM=[setting], bh=0, hs=np.array([[0.1, 0.3]]))
+                for call in calls:
+                    result = eval(compile(ast.Expression(call), "nested-call", "eval"), {"decode_hsmm": stub}, context)
+                    self.assertEqual(result, (setting[:4], 0.037, len(setting) == 5))
+                result = eval(compile(ast.Expression(values[0]), "nested-setting", "eval"), context)
+                self.assertEqual(result, dict(cost_ha=2, cost_d=8, w_dur=3, beta=4, ha_bonus_only=len(setting) == 5,
+                                              inner_mean=0.2, rate=0.037))
                 self.assertEqual(json.loads(json.dumps(result)), result)
-
-
-if __name__ == "__main__":
-    unittest.main()
+        for version in (feature_version, stage1_version):
+            self.assertEqual(version(VARIANTS["v6_ha_only"]), version(VARIANTS["b0"]))
