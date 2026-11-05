@@ -641,6 +641,22 @@ loss.
   41% for the challenge match. That similarity is why this condition is reported, and it sets no
   parameter.
 
+**Amendment after J6, before any V8 run (2026-11-05). Report only.** J6 passed its registered rules
+and production is changing to `mixed`. This round runs only `mixed_stress`
+(`mixed` plus `eval_stress`), replacing the scheduled `touch_bal_stress` run.
+
+- Training copies and their RNG draws remain identical to `mixed`. Every evaluation copy uses
+  `degrade` at severity 1 with `degrade_external_all.json`, including player gaps and close-ups. The
+  detector is refitted and decoder settings are reselected using stressed copies.
+- J6's random-gap test uses the same `random_ball` generator as `mixed`'s odd training copies. V8's
+  gaps are label-conditioned instead, with separate live gap lengths and stoppage offsets, so this
+  checks `mixed` under a heavier profile of the mechanism its other training copies already use.
+- Run `python -m kora.nested --variant mixed_stress`, followed by the registered diagnostics. Use
+  J6's normal-condition `mixed` result as descriptive context. The registered reporting measures and
+  external parameters are unchanged. This report will not select, tune, or change production and
+  does not estimate the challenge score. J6 informed this amendment, so it is not independent
+  confirmation.
+
 **Outcome:** —
 
 ## José — missing-ball robustness and extra data
