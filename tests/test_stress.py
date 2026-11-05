@@ -9,6 +9,8 @@ import numpy as np
 from kora import degrade as dg, train as tr, variant
 
 
+STRESS_PAIRS = (("touch_bal", "touch_bal_stress"), ("mixed", "mixed_stress"))
+
 def scene(n=1200):
     rng = np.random.default_rng(11)
     return {
@@ -61,31 +63,32 @@ class StressTests(unittest.TestCase):
                     self.assertEqual(rng.bit_generator.state, explicit_rng.bit_generator.state)
 
     def test_stress_preserves_training_copies_and_uses_full_external_evaluation(self):
-        base = variant.VARIANTS["touch_bal"]
-        stress = variant.VARIANTS["touch_bal_stress"]
-        for seed in (1, 7, 2027):
-            with self.subTest(seed=seed):
-                (train, _), draws = self.copies(base, seed)
-                (stress_train, evaluation), stress_draws = self.copies(stress, seed)
-                self.assertEqual(len(train), 2 * tr.TRAIN_COPIES)
-                for actual, expected in zip(stress_train, train):
-                    for a, b in zip(actual, expected):
-                        self.assert_bytes_equal(a, b)
-                # Training draw order and the RNG entering evaluation stay exactly the same.
-                self.assertEqual(stress_draws[:-1], draws[:-1])
-                self.assertTrue(all(kwargs == {} for _, kwargs in stress_draws[:-1]))
-                self.assertEqual(stress_draws[-1][0], draws[-1][0])
-                self.assertEqual(stress_draws[-1][1]["severity"], 1.0)
-                self.assertIs(stress_draws[-1][1]["params"], dg.RANDOM_GAPS)
+        for base_name, stress_name in STRESS_PAIRS:
+            base = variant.VARIANTS[base_name]
+            stress = variant.VARIANTS[stress_name]
+            for seed in (1, 7, 2027):
+                with self.subTest(variant=stress_name, seed=seed):
+                    (train, _), draws = self.copies(base, seed)
+                    (stress_train, evaluation), stress_draws = self.copies(stress, seed)
+                    self.assertEqual(len(train), 2 * tr.TRAIN_COPIES)
+                    for actual, expected in zip(stress_train, train):
+                        for a, b in zip(actual, expected):
+                            self.assert_bytes_equal(a, b)
+                    # Training draw order and the RNG entering evaluation stay exactly the same.
+                    self.assertEqual(stress_draws[:-1], draws[:-1])
+                    self.assertTrue(all(kwargs == {} for _, kwargs in stress_draws[:-1]))
+                    self.assertEqual(stress_draws[-1][0], draws[-1][0])
+                    self.assertEqual(stress_draws[-1][1]["severity"], 1.0)
+                    self.assertIs(stress_draws[-1][1]["params"], dg.RANDOM_GAPS)
 
-                d = scene()
-                rng = np.random.default_rng()
-                rng.bit_generator.state = stress_draws[-1][0]
-                p, b = dg.degrade(d["players"], d["ball"], d["label"], rng,
-                                  severity=1.0, params=dg.RANDOM_GAPS)
-                self.assert_bytes_equal(evaluation[0], raw_features(p, d["team"], b, d["half"]))
-                self.assert_bytes_equal(evaluation[1], d["label"])
-                self.assert_bytes_equal(evaluation[2], d["half"])
+                    d = scene()
+                    rng = np.random.default_rng()
+                    rng.bit_generator.state = stress_draws[-1][0]
+                    p, b = dg.degrade(d["players"], d["ball"], d["label"], rng,
+                                      severity=1.0, params=dg.RANDOM_GAPS)
+                    self.assert_bytes_equal(evaluation[0], raw_features(p, d["team"], b, d["half"]))
+                    self.assert_bytes_equal(evaluation[1], d["label"])
+                    self.assert_bytes_equal(evaluation[2], d["half"])
 
     def test_evaluation_switches_are_mutually_exclusive_before_loading(self):
         with mock.patch.object(tr, "CONFIG", {"eval_stress": True, "eval_rand": True}), \
@@ -103,8 +106,8 @@ class StressTests(unittest.TestCase):
             "mixed_rand": "9d8534dc2398c835eff557c5fa7bfba85f57f577a85c5fd4c0a5760fcb7d5d48",
         }
         for name, config in variant.VARIANTS.items():
-            if name == "touch_bal_stress":
-                continue
+            if name in dict(STRESS_PAIRS).values() or "seed" in config:
+                continue  # stress variants change evaluation copies, seed variants change every draw
             with self.subTest(variant=name):
                 (train, evaluation), _ = self.copies(config, 2027)
                 digest = hashlib.sha256()
@@ -116,10 +119,21 @@ class StressTests(unittest.TestCase):
                 self.assertEqual(digest.hexdigest(), switched.get(name, baseline))
 
     def test_stress_is_report_only_and_has_separate_features(self):
-        base, stress = (variant.VARIANTS[k] for k in ("touch_bal", "touch_bal_stress"))
-        self.assertEqual(stress, {**base, "eval_stress": True})
-        self.assertEqual(variant.PRODUCTION, "touch_bal")
-        self.assertNotEqual(variant.feature_version(base), variant.feature_version(stress))
+        for base_name, stress_name in STRESS_PAIRS:
+            with self.subTest(variant=stress_name):
+                base, stress = variant.VARIANTS[base_name], variant.VARIANTS[stress_name]
+                self.assertEqual(stress, {**base, "eval_stress": True})
+                self.assertNotEqual(variant.PRODUCTION, stress_name)
+                self.assertNotEqual(variant.feature_version(base), variant.feature_version(stress))
+                self.assertNotEqual(variant.stage1_version(base), variant.stage1_version(stress))
+
+    def test_both_stress_variants_share_identical_evaluation_copies(self):
+        for seed in (1, 2027):
+            with self.subTest(seed=seed):
+                (_, a), _ = self.copies(variant.VARIANTS["touch_bal_stress"], seed)
+                (_, b), _ = self.copies(variant.VARIANTS["mixed_stress"], seed)
+                for x, y in zip(a, b):
+                    self.assert_bytes_equal(x, y)
 
     def test_full_every_frame_parameters_hide_more_ball_than_camera_on(self):
         d = scene(n=12000)

@@ -31,6 +31,7 @@ VARIANTS = {
     "touch_bal": {"touch": True, "balance": 0.5},     # R2: R1 + possession-balanced sample weights
     # RESEARCH.md V8: full-severity every-frame evaluation, report only; never used for selection.
     "touch_bal_stress": {"touch": True, "balance": 0.5, "eval_stress": True},
+    "mixed_stress": {"touch": True, "balance": 0.5, "mixed": True, "eval_stress": True},  # V8 amended: mixed under stress
     # RESEARCH.md V7 round 1: give handover detector targets priority over live/dead windows.
     "v7_ha_priority": {"touch": True, "balance": 0.5, "detector": {"ha_priority": True}},
     # J6 on top of production (its registration: "if R1/R2 change PRODUCTION, the same switches go on top").
