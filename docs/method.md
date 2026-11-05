@@ -154,7 +154,9 @@ the duration prior and decoder selection, and scored once.
 - **Boundary targets.** The change detector's training targets mark ±5 frames around each change,
   and live/dead targets overwrite overlapping team-change target frames. A label audit found this
   partly affects 41 of 2,351 team-change windows (1.7%), mostly just before stoppages, and erases
-  none completely (`RESEARCH.md` V7). Its effect on the score has not been measured.
+  none completely (`RESEARCH.md` V7). Giving team changes priority (`v7_ha_priority`) moved
+  nested spellF1 from 0.7528 to 0.7574 but improved only 4 of 7 matches (two unchanged), so it was
+  not kept.
 - **Seven training matches, one league.** All labels are German top-two-division matches; the
   challenge match may differ in style and camera.
 - **With more time:** a video ball detector for the gaps (gated on licensed weights and external

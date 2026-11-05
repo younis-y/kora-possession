@@ -11,7 +11,7 @@
     "J03WR9"
   ],
   "provenance": "kora.nested: each held-out match excluded from stage 1, the detector, the prior, the rate, the duration prior and decoder selection; scored once. Ball and player gaps are simulated from external measurements (kora/degrade.py), not challenge tracking.",
-  "commit": "b15b72db9fd6d53f51efd61246a6457c534a6141",
+  "commit": "7914131a2a70d651d0899e085cbdda0b0ccc1c3b",
   "dirty": false,
   "seed": 2027,
   "variant": "touch_bal",
@@ -19,13 +19,16 @@
     "touch": true,
     "balance": 0.5
   },
-  "feature_version": "fee529f5bd9",
-  "stage1_version": "fee529f5bd9s6612537f8e",
+  "feature_version": "ff4d49f7e6e",
+  "stage1_version": "ff4d49f7e6es6612537f8e",
   "inner_wins": 5,
   "decoder": {
     "inner_wins": 5,
     "plain_grid": null,
     "hsmm_grid": null
+  },
+  "detector": {
+    "ha_priority": false
   },
   "train_copies": 2,
   "subsample": 6,
