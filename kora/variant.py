@@ -29,6 +29,8 @@ VARIANTS = {
     "b0_w4": {"decoder": {"inner_wins": 4}},          # exploratory: HSMM kept on 4 of 6 inner wins (Y5)
     "touch": {"touch": True},                         # R1: touch and handover features
     "touch_bal": {"touch": True, "balance": 0.5},     # R2: R1 + possession-balanced sample weights
+    # RESEARCH.md V8: full-severity every-frame evaluation, report only; never used for selection.
+    "touch_bal_stress": {"touch": True, "balance": 0.5, "eval_stress": True},
     # RESEARCH.md V7 round 1: give handover detector targets priority over live/dead windows.
     "v7_ha_priority": {"touch": True, "balance": 0.5, "detector": {"ha_priority": True}},
     # J6 on top of production (its registration: "if R1/R2 change PRODUCTION, the same switches go on top").
@@ -46,7 +48,7 @@ VARIANTS = {
     "y8b_bal1": {"touch": True, "balance": 1.0},
 }
 PRODUCTION = "touch_bal"                              # Y6: R2 passed against B0 and R1
-FEATURE_KEYS = ("touch", "mixed", "eval_rand")
+FEATURE_KEYS = ("touch", "mixed", "eval_rand", "eval_stress")
 TRAIN_KEYS = ("balance",)
 
 # Decoder selection in kora.nested. A variant overrides any key under "decoder"; nothing here touches the
@@ -82,7 +84,7 @@ def feature_version(config=CONFIG):
     files = [ROOT / "kora" / "features.py", ROOT / "kora" / "degrade.py", ROOT / "models" / "degrade_external.json"]
     if config.get("touch"):
         files.append(ROOT / "kora" / "touch.py")
-    if config.get("mixed") or config.get("eval_rand"):
+    if config.get("mixed") or config.get("eval_rand") or config.get("eval_stress"):
         files.append(ROOT / "models" / "degrade_external_all.json")
     switches = json.dumps({k: config.get(k) for k in FEATURE_KEYS}, sort_keys=True)
     return "f" + _hash([f.read_bytes() for f in files] + [switches])

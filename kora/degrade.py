@@ -49,8 +49,8 @@ def random_ball(ball_xyz, half, rng):
     return out
 
 
-def degrade(players, ball_xyz, label, rng, severity=None):
-    p = PARAMS
+def degrade(players, ball_xyz, label, rng, severity=None, params=None):
+    p = PARAMS if params is None else params
     n, P, _ = players.shape
     s = rng.random() if severity is None else severity
     out_p = players.copy()

@@ -70,6 +70,8 @@ def copies(match):
 
 
 def _copies(match):
+    if CONFIG.get("eval_stress") and CONFIG.get("eval_rand"):
+        raise ValueError("eval_stress and eval_rand are mutually exclusive")
     d = load(match)
     rng = np.random.default_rng([SEED, list(MATCHES).index(match)])
     train = []
@@ -81,7 +83,11 @@ def _copies(match):
         pm_, tm_, bm_ = mirror(p, d["team"], b)
         y = d["label"].copy(); y[y < 2] = 1 - y[y < 2]
         train.append((build(pm_, tm_, bm_, d["half"]), y))
-    p, b = degrade(d["players"], d["ball"], d["label"], rng)
+    if CONFIG.get("eval_stress"):
+        from .degrade import RANDOM_GAPS
+        p, b = degrade(d["players"], d["ball"], d["label"], rng, severity=1.0, params=RANDOM_GAPS)
+    else:
+        p, b = degrade(d["players"], d["ball"], d["label"], rng)
     if CONFIG.get("eval_rand"):
         b = random_ball(d["ball"], d["half"], np.random.default_rng([SEED, list(MATCHES).index(match), TRAIN_COPIES]))
     evaluation = (build(p, d["team"], b, d["half"]), d["label"], d["half"])
