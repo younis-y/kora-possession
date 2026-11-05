@@ -48,6 +48,10 @@ VARIANTS = {
     # RESEARCH.md Y10 (pre-registered 2026-11-05): production + boundary cuts at detector peaks.
     "y10_cuts": {"touch": True, "balance": 0.5, "mixed": True,
                  "decoder": {"cuts": {"theta": [0.2, 0.3, 0.4, 0.5, 0.6], "gap": [6, 12, 25]}}},
+    # RESEARCH.md Y11 (pre-registered 2026-11-05): production + mirror test-time averaging of stage 1.
+    "y11_mirror": {"touch": True, "balance": 0.5, "mixed": True, "tta": True},
+    # RESEARCH.md Y12 (pre-registered 2026-11-05): production + weak-touch peaks (kora/peaks.py).
+    "y12_peaks": {"touch": True, "balance": 0.5, "mixed": True, "peaks": True},
     # Y7 confirmation: the same pipeline with seed 2028 for the degraded copies and stage 1.
     "mixed_s2028": {"touch": True, "balance": 0.5, "mixed": True, "seed": 2028},
 }
@@ -111,8 +115,9 @@ def feature_version(config=CONFIG):
 def stage1_version(config=CONFIG):
     switches = json.dumps({k: config.get(k) for k in TRAIN_KEYS}, sort_keys=True)
     parts = [(ROOT / "kora" / "train.py").read_bytes(), switches]
-    if config.get("dwell"):            # Y8a, added later: keyed only when on, so older caches keep their names
-        parts.append((ROOT / "kora" / "dwell.py").read_bytes())
+    for key in ("dwell", "peaks"):     # Y8a, Y12, added later: keyed only when on, so older caches keep their names
+        if config.get(key):
+            parts.append((ROOT / "kora" / f"{key}.py").read_bytes())
     return feature_version(config) + "s" + _hash(parts)
 
 

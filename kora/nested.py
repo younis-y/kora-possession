@@ -32,7 +32,7 @@ import numpy as np
 from joblib import Parallel, delayed
 
 from .boundary import GRID, RAW, context, model as detector, runs_of, target
-from . import dwell
+from . import dwell, peaks
 from .cuts import relabel
 from . import train as _train
 from .data import cache_dir
@@ -59,16 +59,42 @@ def scores(y, pred, half):
     return pm.spell_scores(gt, pr, pm.valid_runs(gt))
 
 
-def stage1(data, excluded, k):
-    """Stage-1 probabilities on k from a classifier trained without any match in `excluded` (k included)."""
+def stage1(data, excluded, k, mirrored=None):
+    """Stage-1 probabilities on k from a classifier trained without any match in `excluded` (k included).
+
+    With `mirrored` (Y11) they are averaged with the same classifier's H/A-swapped probabilities on k's
+    mirrored evaluation copy; those are cached beside the plain ones under the same stage-1 key."""
     name = k if excluded == {k} else f"{k}_x{''.join(sorted(excluded - {k}))}"
     path = cache_dir() / f"oof_{STAGE1_VERSION}_{name}.npy"           # {k} alone is kora.train's own fold
-    if path.exists():
-        return np.load(path)
-    p = fit_classifier([s for j in MATCHES if j not in excluded for s in data[j][0]]).predict_proba(
-        data[k][1][0].to_numpy())
-    np.save(path, p)
-    return p
+    mpath = path.with_name(f"{path.stem}_mirror.npy")
+    if path.exists() and (mirrored is None or mpath.exists()):
+        p = np.load(path)
+    else:
+        clf = fit_classifier([s for j in MATCHES if j not in excluded for s in data[j][0]])
+        p = clf.predict_proba(data[k][1][0].to_numpy())
+        if not path.exists():
+            np.save(path, p)
+        if mirrored is not None:
+            np.save(mpath, clf.predict_proba(mirrored[k].to_numpy()))
+    return p if mirrored is None else (p + np.load(mpath)[:, [1, 0, 2]]) / 2
+
+
+def mirrored_eval(match, X):
+    """The evaluation copy of `match` with the teams swapped (Y11), checked against its cached copy X.
+
+    Replays kora.train._copies: the shared generator is consumed only by degrade(), once per training
+    copy and then once for the evaluation copy."""
+    d = _train.load(match)
+    i = list(MATCHES).index(match)
+    rng = np.random.default_rng([_train.SEED, i])
+    for _ in range(TRAIN_COPIES):
+        _train.degrade(d["players"], d["ball"], d["label"], rng)
+    p, b = _train.degrade(d["players"], d["ball"], d["label"], rng)
+    if CONFIG.get("eval_rand"):
+        b = _train.random_ball(d["ball"], d["half"], np.random.default_rng([_train.SEED, i, TRAIN_COPIES]))
+    if not np.array_equal(_train.build(p, d["team"], b, d["half"]).to_numpy(), X.to_numpy(), equal_nan=True):
+        raise RuntimeError(f"{match}: replayed evaluation copy differs from the cache")
+    return _train.build(*_train.mirror(p, d["team"], b), d["half"])
 
 
 def fit_detector(ctx, tgt, train, test):
@@ -116,8 +142,14 @@ def main():
     t0 = time.time()
     print(f"variant {NAME} {CONFIG}  features {FEATURE_VERSION}  stage 1 {STAGE1_VERSION}", flush=True)
     data = {m: copies(m) for m in MATCHES}
-    if CONFIG.get("dwell"):                                            # Y8a: columns derived from the cache
-        data = {m: ([(dwell.add(X), lab) for X, lab in tr], (dwell.add(ev[0]), *ev[1:])) for m, (tr, ev) in data.items()}
+    mirrored = {m: mirrored_eval(m, data[m][1][0]) for m in MATCHES} if CONFIG.get("tta") else None
+    if mirrored is not None:
+        print(f"mirrored evaluation copies built and checked ({time.time() - t0:.0f} s)", flush=True)
+    for key, extra in (("dwell", dwell), ("peaks", peaks)):           # Y8a, Y12: columns derived from the cache
+        if CONFIG.get(key):
+            data = {m: ([(extra.add(X), lab) for X, lab in tr], (extra.add(ev[0]), *ev[1:]))
+                    for m, (tr, ev) in data.items()}
+            mirrored = mirrored and {m: extra.add(X) for m, X in mirrored.items()}
     y = {m: data[m][1][1] for m in MATCHES}
     half = {m: data[m][1][2] for m in MATCHES}
     raw = {m: data[m][1][0][RAW] for m in MATCHES}
@@ -126,14 +158,14 @@ def main():
     tgt = {m: target(y[m], half[m], **DETECTOR_CFG) for m in MATCHES}
 
     # 1. stage-1 predictions: outer (kora.train folds) and inner (without m and k)
-    outer = {m: stage1(data, {m}, m) for m in MATCHES}
+    outer = {m: stage1(data, {m}, m, mirrored) for m in MATCHES}
     inner = {}
     for m in MATCHES:
         for k in MATCHES:
             if k != m:
-                inner[m, k] = stage1(data, {m, k}, k)
+                inner[m, k] = stage1(data, {m, k}, k, mirrored)
                 print(f"stage 1 without {m}, {k} ({time.time() - t0:.0f} s)", flush=True)
-    del data
+    del data, mirrored
 
     # 2. per outer match: detector folds on the inner matches, then the detector for m
     ctx = {(m, k): context(inner[m, k], raw[k]) for m, k in inner}

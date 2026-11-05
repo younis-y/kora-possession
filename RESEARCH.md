@@ -266,6 +266,38 @@ both rise for a follow-up; the count ratio; and `kora.errors --compare` interval
 
 **Outcome:** —
 
+### [pending] Y11, Y12: Do mirror averaging and weak-touch peaks help on top of production?
+
+**Candidates (pre-registered 2026-11-05, before any outer score).** Each is `mixed` plus one change:
+
+- `y11_mirror` (stage-1 variance). Each stage-1 classifier also predicts on the mirrored evaluation copy:
+  - The copy is the same degraded copy with the teams swapped, rebuilt by replaying `train._copies`.
+    The run fails unless the replay equals the cached copy exactly.
+  - Its H/A-swapped probabilities are averaged with the plain ones.
+  - Training already uses mirrored copies, so this is the matching test-time averaging. Ensembling
+    raised F1@50 by 3.9-5.7 points in C2F-TCN (arXiv 2105.10859).
+  - Stage-1 keys are unchanged. The mirrored predictions are cached beside the plain ones, so the 49
+    classifiers are refitted once. Seed bagging is not included: the classifier's only randomness is
+    its early-stopping split.
+- `y12_peaks` (short possessions; ballradar, KDD 2023; Link & Hoernig 2017). New columns from `kora/peaks.py`:
+  - Weak touches are local maxima of `touch.py`'s touch strength in [0.2, 1) × 2.7 m/s, below the
+    strong-touch threshold.
+  - The columns are the side of and time since the last and next weak touch, and the home minus away
+    weak touches in the past and next 1 s and 2 s.
+  - On one IDSSE match there are 18 per minute of live play, and 12% lie within 0.5 s of a team change
+    against 5.2% of frames.
+  - The planned gain-of-possession rule (Vidal-Codina 2022) is not a candidate, because `touch.py`'s
+    |Δv| > 2.7 m/s already covers both its speed and turn conditions.
+  - Features are reused and stage 1 is refitted.
+
+**Decision rule:** `python -m kora.compare mixed <v>`. Keep if the mean spellF1 is higher and at least
+5 of 7 matches improve strictly. Winners from Y10-Y12 are combined in Y9 and confirmed with seed 2028
+(Y7's rule).
+
+Secondary: recall and precision under 2 s, the count ratio, and `kora.errors --compare` intervals.
+
+**Outcome:** —
+
 ## Vladymyr — error metrics and decoder
 
 ### [verified] V1: Are possessions merged, split, or miscounted?
