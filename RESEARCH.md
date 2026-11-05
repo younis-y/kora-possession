@@ -589,6 +589,35 @@ release, SHA-256 `48816cfb…` for the candidate and `de9dad7c…` for the `touc
   0.618 to 0.623, recall at IoU 0.5 for `<1` s 0.268 to 0.276 and `1–2` s 0.538 to 0.548, and missed
   possessions 891 to 878.
 
+
+### [pending] V8: How does production hold up when the ball is missing far more often?
+
+**Why:** Nested evaluation copies are degraded with the camera-on estimate at a random severity,
+with 3.9% missing-ball frames recorded for B0 in V4. The tech doc lists limited exposure to ball
+gaps as a validation limitation. This item reports how production behaves under much heavier ball
+loss.
+
+**Pre-registration, round 1 (2026-11-05, before any run). Report only.**
+
+- Variant `touch_bal_stress` in `kora/variant.py`: production `touch_bal`, but every evaluation copy
+  is degraded at severity 1 with the every-frame SkillCorner estimate
+  (`models/degrade_external_all.json`, observed external missing share 0.4038, not a guaranteed
+  simulated share). Training copies and their RNG draws are unchanged. Evaluation player gaps and
+  close-ups also use the full-severity every-frame profile. The detector is refitted and decoder
+  settings are reselected using stressed copies. Because every evaluation copy is stressed, the detector, inner selection,
+  and the held-out score all see the heavier gaps, so this measures the whole pipeline under them.
+- Run: `python -m kora.nested --variant touch_bal_stress`, then `kora.errors --predictions` on its
+  bundle. Context: the `touch_bal` result on normal evaluation copies (`nested-v7` release).
+- Reported: spellF1 mean, per match, and per IoU, the realised missing-ball share, and the
+  `kora.errors` diagnostics (counts, cause split, duration recall, transitions, false D by ball
+  visibility).
+- Never used to select, tune, or change production, and not an estimate of the challenge score.
+  Every value comes from external data. The every-frame share is close to the organisers' published
+  41% for the challenge match. That similarity is why this condition is reported, and it sets no
+  parameter.
+
+**Outcome:** —
+
 ## José — missing-ball robustness and extra data
 
 ### [verified] J1: Does the score depend on one blackout simulation?
