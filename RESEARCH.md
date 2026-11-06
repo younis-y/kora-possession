@@ -741,13 +741,15 @@ round 1's result, so it is not independent of it (Y2).
 - Known limits: the same seven matches as round 1. Round 1's positive bootstrap interval does not
   make this round confirmatory.
 - Run: Friday 6 November, after Y9, by Younis.
-- Base pin, proposed (2026-11-06): Y7a, Y7c, Y8a and Y8b were dropped, and Y10 and Y14 failed, but Y9
-  also combines any winners from Y11 and Y12, which have no result yet. If both are dropped, Y9 is
-  unnecessary, its seed-2028 confirmation does not apply, and the base is `mixed`:
-  `VARIANTS["v7r2"] = with_detector("mixed", ha_priority=True)`, with the same feature and stage-1
-  versions as `mixed`. The pin is final only once Y9's decision is complete, and V7 round 2 does not
-  run before that. The base is then rerun on the same clean commit as `v7r2`, because the J6 `mixed`
-  run used an earlier commit.
+- Base pin, final (2026-11-06, before any outer run of `v7r2`): Younis reports that Y11 (0.7553, 4/7)
+  and Y12 (0.7497, 3/7) were dropped. Their JSON has not been checked here. With Y7a, Y7c, Y8a, Y8b,
+  Y10 and Y14 already out, Y9 has nothing to combine, its seed-2028 confirmation does not apply, and
+  the base is `mixed`. Pin: `VARIANTS["v7r2"] = with_detector("mixed", ha_priority=True)` (PR #17),
+  resolving to `{"touch": True, "balance": 0.5, "mixed": True, "detector": {"ha_priority": True}}`,
+  with the same feature and stage-1 versions as `mixed`. Both `mixed` and `v7r2` run with seed 2027
+  on commit `2f8b46f` (PR #17's head), because the J6 `mixed` run used an earlier commit. Before
+  either starts, record Younis's confirmation here that the whole working tree, including `models/`,
+  is clean. The run's `dirty` flag checks only `kora/`. Confirmation: pending.
 ### [pending] V8: How does production hold up when the ball is missing far more often?
 
 **Why:** Nested evaluation copies are degraded with the camera-on estimate at a random severity,
