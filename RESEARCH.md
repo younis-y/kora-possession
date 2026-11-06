@@ -793,6 +793,9 @@ and production is changing to `mixed`. This round runs only `mixed_stress`
   confirmation.
 
 **Outcome (2026-11-06, `mixed_stress`, commit e7019e9, seed 2027):** report only.
+At run start the tracked code was clean, but the whole tree was not: earlier result JSON files
+`nested_touch_bal_stress.json` and `nested_y8a_dwell.json` were untracked in `models/`.
+The metadata `dirty: false` checks only `kora/` and does not establish a clean whole tree.
 Mean spellF1 was 0.6301 ± 0.0402 across seven matches. Per match, in J03WPY, J03WN1,
 J03WMX, J03WOH, J03WQQ, J03WOY, J03WR9 order: 0.6450 / 0.6430 / 0.5508 / 0.6876 /
 0.6061 / 0.6213 / 0.6567. Mean spellF1 at IoU 0.3–0.7 was 0.7449 / 0.6986 / 0.6372 /
@@ -803,14 +806,17 @@ recall was 38/384 (0.099) for true possessions under 1 s and 207/535 (0.387) for
 The association diagnostic reported 228 merge components and 99 split components; 226 of
 those merges involved a missed opposite-team possession. At a 25-frame tolerance, exact H↔A
 handover recall was 1,125/2,351 (0.479). False D on true live frames was 745/518,257 (0.0014)
-when the ball was seen and 1,740/34,848 (0.0499) when missing.
+when the ball was seen and 1,740/34,848 (0.0499) when missing. Of 346 missed true
+possessions under 1 s, 31 had any missing-ball frames and 28 had a missing-ball majority.
+Those misses contained 404 missing frames out of 4,621 total (8.7%). These counts describe
+the simulated evaluation copies, not the challenge match, and do not establish a cause.
 
 Normal-condition `mixed` scored 0.7511 as descriptive context. This is not a controlled
 estimate of the isolated cost of missing balls: the evaluation profile changes player gaps and
 close-ups as well, and the detector is refitted and decoder settings reselected on stressed
 copies. The gaps remain label-conditioned and are not an estimate of the challenge score.
-The V1–V4 diagnostics are saved locally in `data/v8/mixed-stress-errors.txt`; summary and bundle
-are local pending publication. No production decision follows from V8.
+The summary is `models/nested_mixed_stress.json`; regenerating V1–V4 diagnostics requires its
+separate prediction bundle. No production decision follows from V8.
 
 ## José — missing-ball robustness and extra data
 
