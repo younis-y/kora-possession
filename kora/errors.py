@@ -2,6 +2,7 @@
 
     python -m kora.errors --predictions BUNDLE.npz
     python -m kora.errors --predictions CAND.npz --compare BASE.npz --draws 1000 --seed 0
+    python -m kora.errors --seed-pairs CAND_1.npz BASE_1.npz CAND_2.npz BASE_2.npz
 
 Schema v1 contains scalar JSON ``meta`` (schema, fps, matches, provenance) and,
 for each match M, M__y_true, M__y_pred, M__half, M__ball_seen, M__frame. Frame IDs
@@ -54,6 +55,7 @@ BUNDLE_ARRAYS = ("y_true", "y_pred", "half", "ball_seen", "frame")
 DURATION_EDGES_S = (1, 2, 4, 8, 15)
 DURATION_GROUPS = ("<1", "1–2", "2–4", "4–8", "8–15", "15+")
 DURATION_COUNT_FIELDS = ("support", "matched", "missed", "predicted", "matched_predicted", "false_predicted")
+VISIBILITY_COUNT_FIELDS = ("possessions", "frames", "missing_frames", "any_missing", "majority_missing")
 SPELL_ERROR_EDGES_S = (1, 2, 4)
 SPELL_ERROR_GROUPS = ("<1", "1–2", "2–4", "4+")
 SPELL_ERROR_CAUSES = {
@@ -233,6 +235,23 @@ def _duration_counts(true_lengths, pred_lengths, matches):
                     "false_predicted": int(predicted[k] - matched_predicted[k])}
             for k, group in enumerate(DURATION_GROUPS)
         }
+    return counts
+
+
+def _possession_visibility(gt, true_lengths, ball_seen, pairs):
+    """Aggregate visibility inside true spells, using the duration report's pairs."""
+    counts = {group: {status: dict.fromkeys(VISIBILITY_COUNT_FIELDS, 0)
+                      for status in ("matched", "unmatched")} for group in DURATION_GROUPS}
+    matched = {i for i, _, _ in pairs}
+    groups = np.searchsorted(DURATION_EDGES_S, true_lengths, side="right")
+    for i, (a, b, _) in enumerate(gt):
+        row = counts[DURATION_GROUPS[groups[i]]]["matched" if i in matched else "unmatched"]
+        missing = int(np.count_nonzero(ball_seen[a:b] == 0))
+        row["possessions"] += 1
+        row["frames"] += b - a
+        row["missing_frames"] += missing
+        row["any_missing"] += int(missing > 0)
+        row["majority_missing"] += int(2 * missing > b - a)
     return counts
 
 
@@ -426,6 +445,7 @@ def analyse(y_true, y_pred, half, ball_seen, fps=25):
             "matches": matches,
             "spell_errors": _spell_error_counts(gt, pred, y_true, filled, matches[0.5], fps),
             "v2": _duration_counts(true_lengths, pred_lengths, matches),
+            "possession_visibility": _possession_visibility(gt, true_lengths, ball_seen, matches[0.5]),
             "v3": _transition_diagnostics(y_true, y_pred, filled, (a, b)),
             "v4": _frame_count_matrix(y_true[a:b], y_pred[a:b], ball_seen[a:b]),
             "associations": _associations(gt, pred, y_true, filled, overlaps),
@@ -494,6 +514,19 @@ def _comparison_spells(arrays, fps):
     return pm.spell_scores(y, filled, runs)["mean_f1"], len(predicted), flags
 
 
+def _check_pairing(base, candidate, fields):
+    base_meta, base_data = base
+    candidate_meta, candidate_data = candidate
+    matches = base_meta["matches"]
+    if matches != candidate_meta["matches"]:
+        raise ValueError("pairing failed: match IDs must be identical and in the same order")
+    for match in matches:
+        for field in fields:
+            index = BUNDLE_ARRAYS.index(field)
+            if not np.array_equal(base_data[match][index], candidate_data[match][index]):
+                raise ValueError(f"pairing failed: match {match}: {field} arrays differ")
+
+
 def compare_bundles(base, candidate, *, draws=1000, seed=0):
     """Return paired aggregate scores; inputs use load_bundle(include_frame=True).
 
@@ -501,15 +534,10 @@ def compare_bundles(base, candidate, *, draws=1000, seed=0):
     bootstrap indices span all true spells of a match. A match with no true spells
     contributes zero, like its point score, and stays in the match denominator.
     """
+    _check_pairing(base, candidate, ("y_true", "half", "frame", "ball_seen"))
     base_meta, base_data = base
     candidate_meta, candidate_data = candidate
     matches = base_meta["matches"]
-    if matches != candidate_meta["matches"]:
-        raise ValueError("pairing failed: match IDs must be identical and in the same order")
-    for match in matches:
-        for index, field in enumerate(BUNDLE_ARRAYS):
-            if field != "y_pred" and not np.array_equal(base_data[match][index], candidate_data[match][index]):
-                raise ValueError(f"pairing failed: match {match}: {field} arrays differ")
     if not isinstance(draws, (int, np.integer)) or draws <= 0:
         raise ValueError("draws must be a positive integer")
 
@@ -550,6 +578,90 @@ def compare_bundles(base, candidate, *, draws=1000, seed=0):
         "match_interval": tuple(float(x) for x in np.percentile(match_differences, (5, 95))),
         "draws": draws, "seed": seed,
     }
+
+
+def _paired_seed(candidate_meta, base_meta):
+    """Use the producer's meta.seed, never infer a seed from names or ordering."""
+    candidate_seed, base_seed = candidate_meta.get("seed"), base_meta.get("seed")
+    if candidate_seed is None and base_seed is None:
+        return None
+    for value in (candidate_seed, base_seed):
+        if type(value) is not int or value < 0:
+            raise ValueError("seed pairing failed: both bundles must record an integer meta.seed")
+    if candidate_seed != base_seed:
+        raise ValueError("seed pairing failed: candidate and base seeds differ")
+    return candidate_seed
+
+
+def compare_seed_pairs(pairs, *, draws=1000, seed=0):
+    """Compare (candidate, base) bundles across crossed seeds and matches."""
+    if not pairs:
+        raise ValueError("--seed-pairs requires at least one candidate/base pair")
+    if not isinstance(draws, (int, np.integer)) or draws <= 0:
+        raise ValueError("draws must be a positive integer")
+    rng = np.random.RandomState(seed)
+    seeds, recorded = [], set()
+    for index, (candidate, base) in enumerate(pairs, 1):
+        try:
+            run_seed = _paired_seed(candidate[0], base[0])
+            if run_seed is not None and run_seed in recorded:
+                raise ValueError(f"seed pairing failed: duplicate seed {run_seed}")
+            _check_pairing(base, candidate, ("y_true", "half", "frame", "ball_seen"))
+            if index > 1:
+                _check_pairing(pairs[0][1], base, ("y_true",))
+        except ValueError as exc:
+            raise ValueError(f"seed pair {index}: {exc}") from exc
+        seeds.append(run_seed)
+        if run_seed is not None:
+            recorded.add(run_seed)
+    matches = pairs[0][0][0]["matches"]
+    rows = []
+    for run_seed, (candidate, base) in zip(seeds, pairs):
+        differences = np.array([
+            _comparison_spells(candidate[1][match], candidate[0]["fps"])[0]
+            - _comparison_spells(base[1][match], base[0]["fps"])[0] for match in matches])
+        rows.append({"seed": run_seed, "differences": differences.tolist(),
+                     "mean_difference": float(differences.mean()), "wins": int(np.sum(differences > 0))})
+    differences = np.array([row["differences"] for row in rows])
+    interval = None
+    if len(pairs) >= 3:
+        samples = np.empty(draws)
+        for draw in range(draws):
+            seed_picks = rng.randint(0, len(pairs), len(pairs))
+            # One common match draw, shared by every sampled seed.
+            match_picks = rng.randint(0, len(matches), len(matches))
+            samples[draw] = differences[np.ix_(seed_picks, match_picks)].mean()
+        interval = tuple(float(x) for x in np.percentile(samples, (5, 95)))
+    return {"matches": matches, "seeds": rows, "mean_differences": differences.mean(axis=0).tolist(),
+            "mean_difference": float(differences.mean()), "interval": interval,
+            "draws": draws, "seed": seed}
+
+
+def print_seed_comparison(result):
+    print("Pairing check: passed within each pair (match order, y_true, half, frame, ball_seen); "
+          "same match order and y_true across pairs.\n")
+    if any(row["seed"] is None for row in result["seeds"]):
+        print("Seed metadata (meta.seed) is absent for unrecorded pairs; relying on the user's "
+              "candidate/base ordering. Their seed identity and uniqueness cannot be checked.\n")
+    rows = [(str(row["seed"]) if row["seed"] is not None else f"unrecorded (pair {index})",
+             *[f"{value:+.6f}" for value in row["differences"]], f"{row['mean_difference']:+.6f}",
+             f"{row['wins']} / {len(result['matches'])}")
+            for index, row in enumerate(result["seeds"], 1)]
+    rows.append(("MEAN OVER SEEDS", *[f"{value:+.6f}" for value in result["mean_differences"]],
+                 f"{result['mean_difference']:+.6f}", "n/a"))
+    _table(("Stage-1 seed", *[f"{match} delta" for match in result["matches"]], "Mean delta", "Wins / matches"), rows)
+    print("All deltas are candidate − base spellF1; wins use strict, unrounded comparisons.\n")
+    if result["interval"] is None:
+        print("Combined interval refused: at least 3 seed pairs are required; "
+              f"received {len(result['seeds'])}. Per-seed deltas remain descriptive.\n")
+        return
+    print(f"Descriptive crossed seed × match bootstrap: draws: {result['draws']}; seed: {result['seed']}. "
+          "Each draw shares one match resample across all sampled seeds.\n")
+    _table(("Bootstrap", "5th percentile", "95th percentile"),
+           [("Crossed seeds × matches (descriptive)", *[f"{x:+.6f}" for x in result["interval"]])])
+    print("Few seeds/matches and overlapping training folds limit interpretation; this is not a significance "
+          "test or a replacement for the registered keep rule. The recorded shared seed can affect "
+          "degradation as well as training, so variation is not training-only.\n")
 
 
 def print_comparison(result):
@@ -668,6 +780,22 @@ def _print_duration_report(halves):
            [(group, counts[first_iou][group]["predicted"],
              *[_ratio(counts[iou][group]["matched_predicted"], counts[iou][group]["predicted"])
                for iou in pm.SPELL_IOUS]) for group in DURATION_GROUPS])
+
+
+def _print_possession_visibility_report(halves):
+    print("Ball visibility inside true possessions at IoU 0.5 (pooled half-local counts).\n")
+    rows = []
+    for group in DURATION_GROUPS:
+        for status in ("matched", "unmatched"):
+            row = {key: sum(h["possession_visibility"][group][status][key] for h in halves)
+                   for key in VISIBILITY_COUNT_FIELDS}
+            rows.append((group, status, row["possessions"], row["frames"], row["missing_frames"],
+                         _ratio(row["missing_frames"], row["frames"]), row["any_missing"], row["majority_missing"]))
+    _table(("True duration s", "Status", "Possessions", "Frames", "Ball-missing frames",
+            "Frame-weighted missing share", "Possessions with any missing", "Possessions with majority missing"), rows)
+    print("Matched/unmatched use the duration recall's exact IoU 0.5 pairs. Majority means strictly more "
+          "than half the possession's frames are missing. Visibility is from the supplied evaluation copy; "
+          "this association does not establish a cause.\n")
 
 
 def _print_spell_error_report(halves):
@@ -827,6 +955,7 @@ def print_report(meta, results):
            [[sum(h["associations"][key] for _, h in halves)
              for key in ("positive_overlaps", "retained_overlaps", "discarded_overlaps")]])
     _print_duration_report([h for _, h in halves])
+    _print_possession_visibility_report([h for _, h in halves])
     _print_spell_error_report([h for _, h in halves])
     _print_frame_report([h for _, h in halves])
     _print_transition_report([h for _, h in halves])
@@ -836,13 +965,29 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--predictions", type=Path,
                         help="local schema-v1 bundle of aligned decoded labels (provenance is producer-stated)")
-    parser.add_argument("--compare", type=Path, help="paired baseline bundle; requires --predictions")
-    parser.add_argument("--draws", type=int, default=1000, help="bootstrap draws for --compare (default: 1000)")
-    parser.add_argument("--seed", type=int, default=0, help="bootstrap seed for --compare (default: 0)")
+    modes = parser.add_mutually_exclusive_group()
+    modes.add_argument("--compare", type=Path, help="paired baseline bundle; requires --predictions")
+    modes.add_argument("--seed-pairs", type=Path, nargs="+", metavar="BUNDLE",
+                       help="ordered CAND_1 BASE_1 CAND_2 BASE_2 ... bundles, paired by stage-1 seed")
+    parser.add_argument("--draws", type=int, default=1000, help="bootstrap draws for comparisons (default: 1000)")
+    parser.add_argument("--seed", type=int, default=0, help="bootstrap seed for comparisons (default: 0)")
     args = parser.parse_args()
     if args.compare and not args.predictions:
         parser.error("--compare requires --predictions")
+    if args.seed_pairs and (args.predictions or len(args.seed_pairs) % 2):
+        parser.error("--seed-pairs requires CAND BASE pairs and cannot be used with --predictions")
     try:
+        if args.seed_pairs:
+            pairs = [(load_bundle(candidate, include_frame=True), load_bundle(base, include_frame=True))
+                     for candidate, base in zip(args.seed_pairs[::2], args.seed_pairs[1::2])]
+            print("# Seed-paired spellF1 comparison\n")
+            for index, (candidate, base) in enumerate(pairs, 1):
+                print(f"Pair {index} candidate provenance: {candidate[0]['provenance']}")
+                print(f"Pair {index} base provenance: {base[0]['provenance']}")
+            print("\nProvenance is producer-stated; pairing does not verify fold exclusion.\n")
+            result = compare_seed_pairs(pairs, draws=args.draws, seed=args.seed)
+            print_seed_comparison(result)
+            return
         if args.compare:
             base = load_bundle(args.compare, include_frame=True)
             candidate = load_bundle(args.predictions, include_frame=True)
