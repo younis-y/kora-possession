@@ -367,7 +367,7 @@ on 4 of 7, recall under 1 s 0.263 -> 0.286. On heavy gaps, `kora.compare mixed_r
 0.6607 -> 0.6633 (+0.0026), better on 4 of 7, recall under 1 s 0.167 -> 0.211. José's V8 diagnostics
 agree: only 31 of the 346 short possessions `mixed_stress` misses have any missing-ball frame.
 
-### [pending] Y16: Does averaging stage 1 over three seeds help?
+### [verified] Y16: Does averaging stage 1 over three seeds help?
 
 **Why (2026-11-06).** `mixed_s2028` (Y11 outcome) scored 0.7334 against 0.7511, but the seed there also
 drives the evaluation copies, so it mixes test-set and model variance. Here the seeds are split: the
@@ -388,7 +388,12 @@ ships only if `kora.compare mixed_rand y16_seeds_rand` does not lose more than 0
 Secondary: recall and precision under 2 s, `kora.errors --compare`, and the seed-aware interval
 (#18) once merged. If kept, `kora.train`/`kora.run` fit the three members for the submission.
 
-**Outcome:** —
+**Outcome (2026-11-06, 6fe6389, clean checkout):** kept, the first candidate to pass since J6.
+`kora.compare mixed y16_seeds`: 0.7511 -> 0.7566 (+0.0055, median +0.0089), better on 5 of 7 (min
+-0.0090, max +0.0164); spellF1 rises at every IoU from 0.3 to 0.7; recall under 1 s 0.263 -> 0.320, 1-2 s
+0.536 -> 0.557; count ratio 0.879 -> 0.898. Heavy gaps, `kora.compare mixed_rand y16_seeds_rand`:
+0.6607 -> 0.6783 (+0.0176), better on 6 of 7; recall under 1 s 0.167 -> 0.195. Both well inside the V8
+condition. Next: fit the three members in `kora.train`/`kora.run` for the submission.
 
 ## Vladymyr — error metrics and decoder
 
