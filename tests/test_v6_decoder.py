@@ -63,6 +63,31 @@ def legacy_decode_hsmm(proba, change, segments, prior, ld, cost_ha, cost_d, w, b
     return out
 
 
+
+def exhaustive_paths(e, ld, cost_ha, cost_d, w, bonus):
+    """Enumerate every segmentation and state sequence for tiny synthetic inputs."""
+    best, paths = -np.inf, set()
+
+    def visit(start, previous, score, path):
+        nonlocal best, paths
+        if start == len(e):
+            if score > best:
+                best, paths = score, {path}
+            elif score == best:
+                paths.add(path)
+            return
+        for duration in range(1, min(DMAX, len(e) - start) + 1):
+            for state in range(3):
+                added = e[start:start + duration, state].sum() + w * ld[state, duration - 1]
+                if previous is not None:
+                    added -= cost_d if 2 in (previous, state) else cost_ha
+                    if (previous, state) in ((0, 1), (1, 0)):
+                        added += bonus[start, state]
+                visit(start + duration, state, score + added, path + (state,) * duration)
+
+    visit(0, None, 0.0, ())
+    return paths
+
 class DecoderTests(unittest.TestCase):
     def test_default_hsmm_matches_frozen_reference_on_random_inputs(self):
         for seed in (0, 17, 2027):
@@ -135,6 +160,16 @@ class DecoderTests(unittest.TestCase):
                 bonus = np.zeros((len(e) + 1, 3))
                 bonus[start, destination] = value
                 np.testing.assert_array_equal(hsmm(e, ld, 2, 2, 1, bonus, True), expected)
+
+    def test_exhaustive_multiple_segments_and_backtrace(self):
+        for seed in (0, 17, 2027):
+            with self.subTest(seed=seed):
+                rng = np.random.default_rng(seed)
+                e = rng.integers(-5, 6, (5, 3)).astype(float)
+                ld = rng.integers(-3, 1, (3, DMAX)).astype(float)
+                bonus = rng.integers(-6, 7, (6, 3)).astype(float)
+                expected = exhaustive_paths(e, ld, 2, 4, 2, bonus)
+                self.assertIn(tuple(hsmm(e, ld, 2, 4, 2, bonus, True)), expected)
 
     def test_wrapper_excludes_restart_bonus_and_repeats_stride_tail(self):
         e = np.array([[-100, -100, 5], [-1, -100, 0]], float)
