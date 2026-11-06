@@ -8,3 +8,10 @@ __pycache__/
 *.py[cod]
 .DS_Store
 models/oof.npz
+# submission files and local derived arrays: never committed
+*.csv
+*.npy
+*.pkl
+cache/
+datasets/
+verification/
