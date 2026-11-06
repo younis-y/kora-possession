@@ -786,7 +786,7 @@ round 1's result, so it is not independent of it (Y2).
   on commit `2f8b46f` (PR #17's head), because the J6 `mixed` run used an earlier commit. Before
   either starts, record Younis's confirmation here that the whole working tree, including `models/`,
   is clean. The run's `dirty` flag checks only `kora/`. Confirmation: pending.
-### [pending] V8: How does production hold up when the ball is missing far more often?
+### [verified] V8: How does production hold up when the ball is missing far more often?
 
 **Why:** Nested evaluation copies are degraded with the camera-on estimate at a random severity,
 with 3.9% missing-ball frames recorded for B0 in V4. The tech doc lists limited exposure to ball
@@ -853,6 +853,27 @@ close-ups as well, and the detector is refitted and decoder settings reselected 
 copies. The gaps remain label-conditioned and are not an estimate of the challenge score.
 The summary is `models/nested_mixed_stress.json`; regenerating V1–V4 diagnostics requires its
 separate prediction bundle. No production decision follows from V8.
+
+**Check and remaining diagnostics (2026-11-06, Vladymyr).** The release `nested-v8` bundle
+`nested_mixed_stress_predictions.npz` has SHA-256 `8ebd5a9348adfd6ac159b265f7f30ba93399ae963fd6ce07bb71a3e210d9151e`
+(GitHub records no digest for it). `kora.errors --predictions` on it (PR #18 code, `2da0ac9`)
+reproduces every diagnostic count above. The JSON matches the mean, per-match and per-IoU scores and
+the possession counts. The two untracked JSONs are outputs; `kora.nested` at `e7019e9` reads no
+result JSON, so they could not affect the run. The registered diagnostics not listed above:
+
+- Missed true possessions at IoU 0.5: 1,256. Absorbed by the other team 573 (45.6%), same team with
+  boundaries off 590 (47.0%), team swap 74, dead ball instead 19. Under 1 s: 206 of 346 absorbed by the
+  other team, 124 boundaries off, 13 dead ball, 3 team swap.
+- Invented predicted possessions: 821. Inside the other team's possession 317, same team with
+  boundaries off 356, team swap 74, on dead ball 64, mixed 10.
+- Missed live→D transitions at 25 frames: 295. A predicted stoppage lay within 25 frames but the
+  preceding team was wrong for 238 (80.7%); no predicted stoppage for 57.
+- Ball visibility in true possessions of 1–2 s: missed 328 with 1,044 of 11,897 frames missing
+  (8.8%), found 207 with 259 of 7,964 (3.3%). Under 1 s, found possessions had no missing frames.
+
+In these stressed copies, 206 of 346 missed true possessions under 1 s were classified as absorbed by
+the other team; 31 had any missing-ball frames. These descriptive counts do not establish why the
+possessions were missed. Report only.
 
 ## José — missing-ball robustness and extra data
 
