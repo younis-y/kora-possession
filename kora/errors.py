@@ -583,11 +583,9 @@ def compare_bundles(base, candidate, *, draws=1000, seed=0):
 def _paired_seed(candidate_meta, base_meta):
     """Use the producer's meta.seed, never infer a seed from names or ordering."""
     candidate_seed, base_seed = candidate_meta.get("seed"), base_meta.get("seed")
-    if candidate_seed is None and base_seed is None:
-        return None
     for value in (candidate_seed, base_seed):
         if type(value) is not int or value < 0:
-            raise ValueError("seed pairing failed: both bundles must record an integer meta.seed")
+            raise ValueError("seed pairing failed: both bundles must record a non-negative integer meta.seed")
     if candidate_seed != base_seed:
         raise ValueError("seed pairing failed: candidate and base seeds differ")
     return candidate_seed
@@ -604,16 +602,15 @@ def compare_seed_pairs(pairs, *, draws=1000, seed=0):
     for index, (candidate, base) in enumerate(pairs, 1):
         try:
             run_seed = _paired_seed(candidate[0], base[0])
-            if run_seed is not None and run_seed in recorded:
+            if run_seed in recorded:
                 raise ValueError(f"seed pairing failed: duplicate seed {run_seed}")
             _check_pairing(base, candidate, ("y_true", "half", "frame", "ball_seen"))
             if index > 1:
-                _check_pairing(pairs[0][1], base, ("y_true",))
+                _check_pairing(pairs[0][1], base, ("y_true", "half", "frame"))
         except ValueError as exc:
             raise ValueError(f"seed pair {index}: {exc}") from exc
         seeds.append(run_seed)
-        if run_seed is not None:
-            recorded.add(run_seed)
+        recorded.add(run_seed)
     matches = pairs[0][0][0]["matches"]
     rows = []
     for run_seed, (candidate, base) in zip(seeds, pairs):
@@ -639,17 +636,15 @@ def compare_seed_pairs(pairs, *, draws=1000, seed=0):
 
 def print_seed_comparison(result):
     print("Pairing check: passed within each pair (match order, y_true, half, frame, ball_seen); "
-          "same match order and y_true across pairs.\n")
-    if any(row["seed"] is None for row in result["seeds"]):
-        print("Seed metadata (meta.seed) is absent for unrecorded pairs; relying on the user's "
-              "candidate/base ordering. Their seed identity and uniqueness cannot be checked.\n")
-    rows = [(str(row["seed"]) if row["seed"] is not None else f"unrecorded (pair {index})",
+          "same match order, y_true, half and frame across pairs.\n")
+    rows = [(str(row["seed"]),
              *[f"{value:+.6f}" for value in row["differences"]], f"{row['mean_difference']:+.6f}",
              f"{row['wins']} / {len(result['matches'])}")
-            for index, row in enumerate(result["seeds"], 1)]
+            for row in result["seeds"]]
     rows.append(("MEAN OVER SEEDS", *[f"{value:+.6f}" for value in result["mean_differences"]],
                  f"{result['mean_difference']:+.6f}", "n/a"))
-    _table(("Stage-1 seed", *[f"{match} delta" for match in result["matches"]], "Mean delta", "Wins / matches"), rows)
+    _table(("Run seed (meta.seed)", *[f"{match} delta" for match in result["matches"]], "Mean delta", "Wins / matches"), rows)
+    print("meta.seed is producer-stated; in this project it drives degradation as well as stage 1.\n")
     print("All deltas are candidate − base spellF1; wins use strict, unrounded comparisons.\n")
     if result["interval"] is None:
         print("Combined interval refused: at least 3 seed pairs are required; "
@@ -968,7 +963,7 @@ def main():
     modes = parser.add_mutually_exclusive_group()
     modes.add_argument("--compare", type=Path, help="paired baseline bundle; requires --predictions")
     modes.add_argument("--seed-pairs", type=Path, nargs="+", metavar="BUNDLE",
-                       help="ordered CAND_1 BASE_1 CAND_2 BASE_2 ... bundles, paired by stage-1 seed")
+                       help="ordered CAND_1 BASE_1 CAND_2 BASE_2 ... bundles, paired by run seed (meta.seed)")
     parser.add_argument("--draws", type=int, default=1000, help="bootstrap draws for comparisons (default: 1000)")
     parser.add_argument("--seed", type=int, default=0, help="bootstrap seed for comparisons (default: 0)")
     args = parser.parse_args()

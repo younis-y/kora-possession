@@ -876,6 +876,8 @@ class ErrorChecks(unittest.TestCase):
 
     def test_seed_pairs_hand_counted_scores(self):
         pairs = self.seed_pairs_example()
+        for _, data in pairs[1]:
+            data["M0"][errors.BUNDLE_ARRAYS.index("ball_seen")][:] = False
         result = errors.compare_seed_pairs(pairs, draws=53, seed=7)
         expected = np.array([[1, -1], [1, 1], [-1, 0]]) / 3
         np.testing.assert_allclose([row["differences"] for row in result["seeds"]], expected)
@@ -890,6 +892,8 @@ class ErrorChecks(unittest.TestCase):
             errors.print_seed_comparison(result)
         self.assertIn("| 11 | +0.333333 | -0.333333 | +0.000000 | 1 / 2 |", output.getvalue())
         self.assertIn("| MEAN OVER SEEDS | +0.111111 | +0.000000 | +0.055556 | n/a |", output.getvalue())
+        self.assertIn("Run seed (meta.seed)", output.getvalue())
+        self.assertIn("meta.seed is producer-stated", output.getvalue())
         self.assertIn("descriptive", output.getvalue())
 
     def test_seed_pairs_crossed_bootstrap_shares_match_draw(self):
@@ -932,6 +936,25 @@ class ErrorChecks(unittest.TestCase):
                     with self.assertRaisesRegex(ValueError, message):
                         errors.compare_seed_pairs(pairs)
 
+    def test_seed_pairs_invalid_seed_metadata(self):
+        for value in (None, -1, True, 11.0, "11"):
+            with self.subTest(seed=value):
+                pairs = self.seed_pairs_example()
+                for meta, _ in pairs[0]:
+                    meta["seed"] = value
+                with self.assertRaisesRegex(ValueError, "non-negative integer meta.seed"):
+                    errors.compare_seed_pairs(pairs)
+
+    def test_seed_pairs_cross_pair_half_and_frame_mismatch(self):
+        for field in ("half", "frame"):
+            with self.subTest(field=field):
+                pairs = self.seed_pairs_example()
+                for _, data in pairs[1]:
+                    data["M0"][errors.BUNDLE_ARRAYS.index(field)][:] += 1
+                with mock.patch.object(errors, "_comparison_spells", side_effect=AssertionError("scored before pairing")):
+                    with self.assertRaisesRegex(ValueError, f"{field} arrays differ"):
+                        errors.compare_seed_pairs(pairs)
+
     def run_seed_cli(self, paths, *extra):
         return subprocess.run([sys.executable, "-B", "-m", "kora.errors", "--seed-pairs",
                                *map(str, paths), *map(str, extra)],
@@ -958,9 +981,10 @@ class ErrorChecks(unittest.TestCase):
             for path, bundle in zip(paths[:2], pairs[0]):
                 self.save_comparison_bundle(path, bundle)
             completed = self.run_seed_cli(paths[:2])
-            self.assertEqual(completed.returncode, 0, completed.stderr)
-            self.assertIn("Seed metadata (meta.seed) is absent", completed.stdout)
-            self.assertIn("user's candidate/base ordering", completed.stdout)
+            self.assertEqual(completed.returncode, 2)
+            self.assertIn("both bundles must record a non-negative integer meta.seed", completed.stderr)
+            self.assertNotIn("Traceback", completed.stderr)
+            self.assertNotIn("Mean delta", completed.stdout)
             for value, message in ((99, "seeds differ"), (12, "duplicate seed")):
                 pairs[0][0][0]["seed"], pairs[0][1][0]["seed"] = value, 12
                 for path, bundle in zip(paths[:2], pairs[0]):
