@@ -792,7 +792,25 @@ and production is changing to `mixed`. This round runs only `mixed_stress`
   does not estimate the challenge score. J6 informed this amendment, so it is not independent
   confirmation.
 
-**Outcome:** —
+**Outcome (2026-11-06, `mixed_stress`, commit e7019e9, seed 2027):** report only.
+Mean spellF1 was 0.6301 ± 0.0402 across seven matches. Per match, in J03WPY, J03WN1,
+J03WMX, J03WOH, J03WQQ, J03WOY, J03WR9 order: 0.6450 / 0.6430 / 0.5508 / 0.6876 /
+0.6061 / 0.6213 / 0.6567. Mean spellF1 at IoU 0.3–0.7 was 0.7449 / 0.6986 / 0.6372 /
+0.5730 / 0.4967. The model reported 2,626 possessions versus 3,061 true (0.858 ratio).
+
+The realized ball-missing share was 328,976 / 1,002,644 frames (32.81%). At IoU 0.5,
+recall was 38/384 (0.099) for true possessions under 1 s and 207/535 (0.387) for 1–2 s.
+The association diagnostic reported 228 merge components and 99 split components; 226 of
+those merges involved a missed opposite-team possession. At a 25-frame tolerance, exact H↔A
+handover recall was 1,125/2,351 (0.479). False D on true live frames was 745/518,257 (0.0014)
+when the ball was seen and 1,740/34,848 (0.0499) when missing.
+
+Normal-condition `mixed` scored 0.7511 as descriptive context. This is not a controlled
+estimate of the isolated cost of missing balls: the evaluation profile changes player gaps and
+close-ups as well, and the detector is refitted and decoder settings reselected on stressed
+copies. The gaps remain label-conditioned and are not an estimate of the challenge score.
+The V1–V4 diagnostics are saved locally in `data/v8/mixed-stress-errors.txt`; summary and bundle
+are local pending publication. No production decision follows from V8.
 
 ## José — missing-ball robustness and extra data
 
