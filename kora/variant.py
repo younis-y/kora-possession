@@ -62,6 +62,11 @@ VARIANTS = {
                    "decoder": {"events": {"theta": [0.1, 0.15, 0.2, 0.3, 0.4], "max_len": [50, 100, 200]}}},
     "y15_fill": {"touch": True, "balance": 0.5, "mixed": True, "fill": True},
     "y15_fill_rand": {"touch": True, "balance": 0.5, "mixed": True, "eval_rand": True, "fill": True},
+    # RESEARCH.md Y16 (pre-registered 2026-11-06): production with stage 1 averaged over three members whose
+    # training copies and classifier use seeds 2027 / 2028 / 2029; evaluation copies stay on seed 2027.
+    # "ensemble" is not a feature or training key, so member 2027 is production's own stage-1 cache.
+    "y16_seeds": {"touch": True, "balance": 0.5, "mixed": True, "ensemble": [2027, 2028, 2029]},
+    "y16_seeds_rand": {"touch": True, "balance": 0.5, "mixed": True, "eval_rand": True, "ensemble": [2027, 2028, 2029]},
 }
 PRODUCTION = "mixed"                                  # J6: mixed_rand 7/7 over b0_rand, mixed -0.0017 vs touch_bal (<= 0.01)
 FEATURE_KEYS = ("touch", "mixed", "eval_rand")

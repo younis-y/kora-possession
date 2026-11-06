@@ -28,6 +28,7 @@ import json
 import subprocess
 import time
 import warnings
+from contextlib import contextmanager
 
 import numpy as np
 from joblib import Parallel, delayed
@@ -41,7 +42,8 @@ from .decode import decode, decode_hsmm, log_duration
 from .external import MATCHES
 from .train import (FEATURE_VERSION, GRID_ALPHA, GRID_D, GRID_HA, MODELS, STAGE1_VERSION, SUBSAMPLE,
                     TRAIN_COPIES, copies, fit_classifier, segments_of)
-from .variant import CONFIG, NAME, VARIANTS, _hash, decoder, detector as detector_config
+from .variant import (CONFIG, NAME, VARIANTS, _hash, decoder, detector as detector_config, feature_version,
+                      stage1_version)
 from .vendor import possession_metrics as pm
 
 warnings.filterwarnings("ignore", category=RuntimeWarning)
@@ -123,6 +125,57 @@ def event_probs(data, y):
     return {(m, k): np.load(path(m, k)) for m in MATCHES for k in MATCHES}
 
 
+def eval_config(rand):
+    """Y16: the variant's evaluation setup, with or without random ball gaps (mixed / mixed_rand)."""
+    return {**{k: v for k, v in CONFIG.items() if k not in ("ensemble", "eval_rand")}, **({"eval_rand": True} if rand else {})}
+
+
+def eval_copies(rand):
+    """(feature key, {match: evaluation copy}) read from the cache of mixed or mixed_rand."""
+    import pandas as pd
+    fv, out = feature_version(eval_config(rand)), {}
+    for m in MATCHES:
+        path = cache_dir() / f"feat_{fv}_{m}.npz"
+        if not path.exists():
+            raise SystemExit(f"{path.name} missing: run kora.nested --variant {'mixed_rand' if rand else 'mixed'} first")
+        z = np.load(path, allow_pickle=False)
+        out[m] = pd.DataFrame(z["Xe"], columns=list(z["columns"]))
+    return fv, out
+
+
+@contextmanager
+def member(seed):
+    """Y16: kora.train set up for one ensemble member (training copies and classifier on `seed`, no
+    evaluation gaps); yields the member's stage-1 key. kora.train reads these globals at call time."""
+    cfg = {**eval_config(False), "seed": seed}
+    saved = _train.SEED, _train.CONFIG, _train.FEATURE_VERSION
+    _train.SEED, _train.CONFIG, _train.FEATURE_VERSION = seed, cfg, feature_version(cfg)
+    try:
+        yield stage1_version(cfg)
+    finally:
+        _train.SEED, _train.CONFIG, _train.FEATURE_VERSION = saved
+
+
+def member_stage1(seed, evs):
+    """Y16: one member's stage-1 probabilities {fv: {(excluded, k): P}} on every evaluation set in `evs`
+    ({fv: {match: X}}). Excluded sets are the 7 singles and 21 pairs; a pair's classifier predicts on
+    both its matches, so 28 fits serve all 49 predictions. Cached per member key and evaluation key."""
+    sets = [frozenset([m]) for m in MATCHES] + [frozenset(p) for p in itertools.combinations(MATCHES, 2)]
+    with member(seed) as key:
+        name = lambda ex, k: k if ex == {k} else f"{k}_x{''.join(sorted(ex - {k}))}"
+        path = lambda fv, ex, k: cache_dir() / f"oof_{key}_e{fv}_{name(ex, k)}.npy"
+        todo = [ex for ex in sets if not all(path(fv, ex, k).exists() for fv in evs for k in ex)]
+        if todo:
+            train = {m: copies(m)[0] for m in MATCHES}
+            for ex in todo:
+                clf = fit_classifier([s for j in MATCHES if j not in ex for s in train[j]])
+                for fv, X in evs.items():
+                    for k in ex:
+                        np.save(path(fv, ex, k), clf.predict_proba(X[k].to_numpy()))
+                print(f"  member {seed}: stage 1 without {', '.join(sorted(ex))}", flush=True)
+    return {fv: {(ex, k): np.load(path(fv, ex, k)) for ex in sets for k in ex} for fv in evs}
+
+
 def event_scores(paths, E, y, half, theta, max_len):
     return [scores(y[k], events.relabel(paths[k], E[k], half[k], theta, max_len), half[k])["mean_f1"] for k in paths]
 
@@ -201,6 +254,18 @@ def main():
                 inner[m, k] = stage1(data, {m, k}, k, mirrored)
                 print(f"stage 1 without {m}, {k} ({time.time() - t0:.0f} s)", flush=True)
     del data, mirrored
+    if CONFIG.get("ensemble"):         # Y16: equal-weight average with the other members' stage 1
+        base, *others = CONFIG["ensemble"]
+        evs = dict(eval_copies(r) for r in (False, True))
+        if base != _train.SEED or FEATURE_VERSION not in evs:
+            raise SystemExit("the first ensemble seed must be production's and the evaluation copies its own")
+        for s in others:
+            p = member_stage1(s, evs)[FEATURE_VERSION]
+            outer = {m: outer[m] + p[frozenset([m]), m] for m in MATCHES}
+            inner = {(m, k): v + p[frozenset([m, k]), k] for (m, k), v in inner.items()}
+            print(f"member {s} added ({time.time() - t0:.0f} s)", flush=True)
+        outer = {m: v / len(CONFIG["ensemble"]) for m, v in outer.items()}
+        inner = {mk: v / len(CONFIG["ensemble"]) for mk, v in inner.items()}
 
     # 2. per outer match: detector folds on the inner matches, then the detector for m
     ctx = {(m, k): context(inner[m, k], raw[k]) for m, k in inner}

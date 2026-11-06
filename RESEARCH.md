@@ -273,7 +273,7 @@ both rise for a follow-up; the count ratio; and `kora.errors --compare` interval
 
 **Outcome:** —
 
-### [pending] Y11, Y12: Do mirror averaging and weak-touch peaks help on top of production?
+### [dropped] Y11, Y12: Do mirror averaging and weak-touch peaks help on top of production?
 
 **Candidates (pre-registered 2026-11-05, before any outer score).** Each is `mixed` plus one change:
 
@@ -303,9 +303,12 @@ both rise for a follow-up; the count ratio; and `kora.errors --compare` interval
 
 Secondary: recall and precision under 2 s, the count ratio, and `kora.errors --compare` intervals.
 
-**Outcome:** —
+**Outcome (2026-11-06):** both dropped, so Y9 has nothing to combine and the V7 round 2 base stays `mixed`.
+`y11_mirror`: mean 0.7511 -> 0.7553 (+0.0042), better on 4 of 7, recall under 1 s 0.263 -> 0.294.
+`y12_peaks`: 0.7511 -> 0.7497 (-0.0014), better on 3 of 7. Seed check: `mixed_s2028` scored 0.7334;
+its evaluation copies are degraded with seed 2028 too, so this is not a paired comparison (see Y16).
 
-### [pending] Y13-Y15: Can a touch-event model find the possessions the frame model swallows?
+### [dropped] Y13-Y15: Can a touch-event model find the possessions the frame model swallows?
 
 **Diagnosis (2026-11-05, `python -m kora.ceiling mixed mixed_rand`, held-out predictions of production).**
 spellF1 if one error type were fixed perfectly:
@@ -357,7 +360,35 @@ filled by straight lines, with a flag column, before features. Both are decided 
 0.879 -> 0.891. Events beat no events on the inner mean in all 7 folds (+0.004 to +0.010) but passed
 the 5-of-6 inner rule in only 2, so 5 folds fell back to production. The event model is better than
 the detector but at usable false-peak rates still cuts out only 12-17% of swallowed spells; its
-features are the frame columns at the kink. Y15: pending.
+features are the frame columns at the kink.
+
+**Outcome (Y15, 2026-11-06):** dropped. `kora.compare mixed y15_fill`: 0.7511 -> 0.7576 (+0.0065), better
+on 4 of 7, recall under 1 s 0.263 -> 0.286. On heavy gaps, `kora.compare mixed_rand y15_fill_rand`:
+0.6607 -> 0.6633 (+0.0026), better on 4 of 7, recall under 1 s 0.167 -> 0.211. José's V8 diagnostics
+agree: only 31 of the 346 short possessions `mixed_stress` misses have any missing-ball frame.
+
+### [pending] Y16: Does averaging stage 1 over three seeds help?
+
+**Why (2026-11-06).** `mixed_s2028` (Y11 outcome) scored 0.7334 against 0.7511, but the seed there also
+drives the evaluation copies, so it mixes test-set and model variance. Here the seeds are split: the
+evaluation copies stay those of `mixed` (and `mixed_rand`), and only training changes.
+
+**Candidate (pre-registered 2026-11-06, before any member is fitted).** `y16_seeds` = `mixed` with
+stage 1 averaged, equal weights, over three members. Member s degrades its training copies with seed s
+(`train._copies`) and seeds its classifier with s, for s = 2027, 2028, 2029, fixed now; no other seeds
+or weights will be tried. Member 2027 is production itself (same cache). The classifier's own
+randomness is only its early-stopping split (Y11), so most of the members' diversity comes from the
+degraded copies, which makes this bagging over simulated gaps. The average replaces stage 1 in both the
+outer and the inner predictions; the detector, prior, decoder grids and selection rules are rerun on it
+unchanged (`kora/nested.py`, `member_stage1`). A pair's classifier predicts on both its matches, so
+each new member needs 28 fits, not 49, and every fit also predicts the heavy-gap evaluation copies.
+
+**Decision rule:** `kora.compare mixed y16_seeds` (mean up and at least 5 of 7 matches better). It
+ships only if `kora.compare mixed_rand y16_seeds_rand` does not lose more than 0.01 on the mean (V8).
+Secondary: recall and precision under 2 s, `kora.errors --compare`, and the seed-aware interval
+(#18) once merged. If kept, `kora.train`/`kora.run` fit the three members for the submission.
+
+**Outcome:** —
 
 ## Vladymyr — error metrics and decoder
 
