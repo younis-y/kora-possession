@@ -22,12 +22,18 @@ warnings.filterwarnings("ignore", category=RuntimeWarning)
 MODELS = Path(__file__).resolve().parent.parent / "models"
 
 
+def stage1(bundle, X):
+    """Stage-1 probabilities, averaged over the seed members when there are several (Y16, kora/ensemble.py)."""
+    x = X[bundle["columns"]].to_numpy()
+    return np.mean([m.predict_proba(x) for m in bundle.get("models") or [bundle["model"]]], axis=0)
+
+
 def predict():
     players, team, ball, section, graded = load_target()
     X = build(players, team, ball, section)
     bundle = joblib.load(MODELS / "classifier.joblib")
     cfg = json.loads((MODELS / "decoder.json").read_text())
-    proba = bundle["model"].predict_proba(X[bundle["columns"]].to_numpy())
+    proba = stage1(bundle, X)
     prior = np.array(cfg["prior"])
     if "hsmm" in cfg:                         # kept only if it won leave-one-match-out CV
         h = cfg["hsmm"]

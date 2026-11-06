@@ -68,7 +68,7 @@ VARIANTS = {
     "y16_seeds": {"touch": True, "balance": 0.5, "mixed": True, "ensemble": [2027, 2028, 2029]},
     "y16_seeds_rand": {"touch": True, "balance": 0.5, "mixed": True, "eval_rand": True, "ensemble": [2027, 2028, 2029]},
 }
-PRODUCTION = "mixed"                                  # J6: mixed_rand 7/7 over b0_rand, mixed -0.0017 vs touch_bal (<= 0.01)
+PRODUCTION = "y16_seeds"                              # Y16: 5/7 over mixed, heavy gaps 6/7 (was mixed, J6)
 FEATURE_KEYS = ("touch", "mixed", "eval_rand")
 TRAIN_KEYS = ("balance",)
 

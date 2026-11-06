@@ -1,4 +1,5 @@
-"""Checks for Y16 (stage 1 averaged over seed members): cache keys, kora.train globals, fits per member."""
+"""Checks for Y16 (stage 1 averaged over seed members): cache keys, kora.train globals, fits per member,
+and the averaged prediction in kora.run."""
 import tempfile
 import unittest
 from pathlib import Path
@@ -7,7 +8,7 @@ from unittest import mock
 import numpy as np
 import pandas as pd
 
-from kora import nested, train, variant
+from kora import nested, run, train, variant
 
 
 class KeyTests(unittest.TestCase):
@@ -56,6 +57,19 @@ class MemberTests(unittest.TestCase):
             self.assertEqual(len(p), 3 + 6)
             nested.member_stage1(2028, {"fv": X})
             self.assertEqual(len(fits), 6)                                   # second call reads the cache
+            self.assertEqual(len(nested.member_stage1(2029, {"fv": X}, pairs=False)["fv"]), 3)
+            self.assertEqual(len(fits), 9)                                   # singles only: kora.ensemble
+
+
+class RunTests(unittest.TestCase):
+    def test_stage1_averages_members_and_reads_single_model_bundles(self):
+        class Const:
+            def __init__(self, p): self.p = np.array(p)
+            def predict_proba(self, x): return np.tile(self.p, (len(x), 1))
+        X = pd.DataFrame({"a": np.zeros(3), "b": np.ones(3)})
+        two = {"models": [Const([0.6, 0.2, 0.2]), Const([0.2, 0.6, 0.2])], "columns": ["a"]}
+        np.testing.assert_allclose(run.stage1(two, X), np.tile([0.4, 0.4, 0.2], (3, 1)))
+        np.testing.assert_allclose(run.stage1({"model": Const([1, 0, 0]), "columns": ["b"]}, X)[0], [1, 0, 0])
 
 
 if __name__ == "__main__":

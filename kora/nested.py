@@ -156,11 +156,12 @@ def member(seed):
         _train.SEED, _train.CONFIG, _train.FEATURE_VERSION = saved
 
 
-def member_stage1(seed, evs):
+def member_stage1(seed, evs, pairs=True):
     """Y16: one member's stage-1 probabilities {fv: {(excluded, k): P}} on every evaluation set in `evs`
-    ({fv: {match: X}}). Excluded sets are the 7 singles and 21 pairs; a pair's classifier predicts on
-    both its matches, so 28 fits serve all 49 predictions. Cached per member key and evaluation key."""
-    sets = [frozenset([m]) for m in MATCHES] + [frozenset(p) for p in itertools.combinations(MATCHES, 2)]
+    ({fv: {match: X}}). Excluded sets are the 7 singles and (with `pairs`) 21 pairs; a pair's classifier
+    predicts on both its matches, so 28 fits serve all 49 predictions. Cached per member key and
+    evaluation key; kora.ensemble needs the singles only."""
+    sets = [frozenset([m]) for m in MATCHES] + [frozenset(p) for p in itertools.combinations(MATCHES, 2) if pairs]
     with member(seed) as key:
         name = lambda ex, k: k if ex == {k} else f"{k}_x{''.join(sorted(ex - {k}))}"
         path = lambda fv, ex, k: cache_dir() / f"oof_{key}_e{fv}_{name(ex, k)}.npy"
