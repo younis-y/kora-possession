@@ -321,8 +321,10 @@ def main():
                 inner[m, k] = stage1(data, {m, k}, k, mirrored, twin)
                 print(f"stage 1 without {m}, {k} ({time.time() - t0:.0f} s)", flush=True)
     if CONFIG.get("seq"):              # Y22: fitted while the training copies are loaded, blended in below
-        seqP = seq_stage1(data, dict(eval_copies(r) for r in (False, True)), CONFIG["seq"],
-                          pairs=not args.screen)[FEATURE_VERSION]
+        evs, sc = dict(eval_copies(r) for r in (False, True)), CONFIG["seq"]
+        parts = [seq_stage1(data, evs, {**sc, "seed": s}, pairs=not args.screen)[FEATURE_VERSION]
+                 for s in sc.get("seeds") or [sc["seed"]]]                   # Y23: averaged over seeds
+        seqP = {key: np.mean([p[key] for p in parts], axis=0) for key in parts[0]}
         print(f"temporal network done ({time.time() - t0:.0f} s)", flush=True)
     del data, mirrored
     if CONFIG.get("ensemble"):         # Y16: equal-weight average with the other members' stage 1

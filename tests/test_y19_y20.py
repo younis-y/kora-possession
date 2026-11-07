@@ -59,6 +59,11 @@ class Y22Tests(unittest.TestCase):
             self.assertEqual(variant.stage1_version(V[f"y22_{k}"]), variant.stage1_version(V["y16_seeds"]))
             self.assertEqual(variant.stage1_version(V[f"y22_{k}_rand"]), variant.stage1_version(V["y16_seeds_rand"]))
         self.assertEqual(V["y22_half_s2028"]["seq"], {"weight": 0.5, "seed": 2028, "settings": {}})
+        self.assertEqual(V["y23_seeds3"]["seq"]["seeds"], [2027, 2028, 2029])
+        self.assertEqual(V["y23_big_s2028"]["seq"]["seed"], 2028)
+        self.assertEqual(seq.radius({**seq.SETTINGS, **variant.BIG}), 511)
+        self.assertGreater(variant.BIG["length"], 2 * 511)
+        self.assertEqual(variant.stage1_version(V["y23_big"]), variant.stage1_version(V["y16_seeds"]))
 
     @unittest.skipUnless(HAS["torch"], "torch not installed (Y22 research dependency)")
     def test_tiny_fit_predicts_probabilities_per_half(self):

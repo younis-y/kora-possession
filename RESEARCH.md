@@ -563,6 +563,33 @@ Y16's members) serves all three weights and both evaluation sets. Nothing else i
    Stage A and Stage B both pass; the build then fits the network on all seven matches and `kora.run`
    blends it.
 
+**Outcome so far (2026-11-07, f4844d5, clean checkout).** Screens against the tree-only folds (0.7575):
+`y22_quarter` 0.7642 (+0.0068, 7/7), `y22_half` 0.7632 (+0.0057, 5/7), `y22_only` 0.7375 (-0.0199, 0/7).
+The network alone is worse than the trees, but blended in it helps: its errors differ. Stage A:
+`kora.compare y16_seeds y22_quarter` 0.7566 -> 0.7673 (+0.0107, median +0.0122), better on 7 of 7 (min
++0.0016, max +0.0186); spellF1 up at every IoU 0.3-0.7 (0.833 -> 0.842 at 0.3, 0.668 -> 0.677 at 0.7);
+recall under 1 s 0.320 -> 0.349, 1-2 s 0.557 -> 0.579; count ratio 0.898 -> 0.908. Heavy gaps,
+`y16_seeds_rand` -> `y22_quarter_rand`: 0.6783 -> 0.6836 (+0.0053, 4/7), inside V8. `y22_half` 0.7653
+(+0.0087, 5/7). So `y22_quarter` is the Stage A winner; Stage B (`y22_quarter_s2028`) is running.
+
+### [pending] Y23: Does averaging the temporal network over seeds, or a larger one, add to Y22?
+
+**Why (2026-11-07).** Alone the network is weaker than the trees (Y22 screen 0.7375 against 0.7575) and,
+like any single fit, noisy; Y16 showed that averaging seeds helps the trees. A larger receptive field
+(+-20 s instead of +-10 s) may also let it see more of a possession.
+
+**Candidates (pre-registered 2026-11-07 14:45, after Y22's Stage A and before its Stage B result).**
+Each is `y22_quarter` (network weight 0.25) with one change; nothing else is tried in this round.
+- `y23_seeds2`: the network averaged over seeds 2027 and 2028 (both fitted by Y22, no new fits).
+- `y23_seeds3`: seeds 2027, 2028 and 2029.
+- `y23_big`: one larger network, 96 channels and 9 blocks (receptive field +-511 frames), 3072-frame
+  windows, batch 12, seed 2027; otherwise as Y22.
+
+**Decision rule.** Against `y22_quarter`: `kora.compare` keep rule (mean up, at least 5 of 7), and the
+`_rand` twin not lower than `y22_quarter_rand` by more than 0.01 (V8). `y23_big` also needs its second
+seed, `y23_big_s2028`, to pass the same checks. The winner is the passer with the largest mean delta. If
+Y22's Stage B fails, the same rules are applied against `y16_seeds` / `y16_seeds_rand` instead.
+
 **Outcome:** —
 
 ## Vladymyr — error metrics and decoder

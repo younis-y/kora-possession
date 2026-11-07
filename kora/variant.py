@@ -91,6 +91,14 @@ for _seed, _tag in ((2027, ""), (2028, "_s2028")):
         VARIANTS[f"y22_{_k}{_tag}"] = {**VARIANTS["y16_seeds"], "seq": {"weight": _w, "seed": _seed, "settings": {}}}
         VARIANTS[f"y22_{_k}{_tag}_rand"] = {**VARIANTS["y16_seeds_rand"],
                                             "seq": {"weight": _w, "seed": _seed, "settings": {}}}
+# RESEARCH.md Y23 (pre-registered 2026-11-07): y22_quarter with the network averaged over seeds, or larger
+# (receptive field +-511 frames); _big_s2028 is the larger network's second-seed check.
+BIG = {"channels": 96, "blocks": 9, "length": 3072, "batch": 12}
+for _k, _sq in (("seeds2", {"seeds": [2027, 2028]}), ("seeds3", {"seeds": [2027, 2028, 2029]}),
+                ("big", {"settings": BIG}), ("big_s2028", {"seed": 2028, "settings": BIG})):
+    _sq = {"weight": 0.25, "seed": 2027, "settings": {}, **_sq}
+    VARIANTS[f"y23_{_k}"] = {**VARIANTS["y16_seeds"], "seq": _sq}
+    VARIANTS[f"y23_{_k}_rand"] = {**VARIANTS["y16_seeds_rand"], "seq": _sq}
 PRODUCTION = "y16_seeds"                           # Y16: 5/7 over mixed, heavy gaps 6/7 (was mixed, J6)
 FEATURE_KEYS = ("touch", "mixed", "eval_rand")
 TRAIN_KEYS = ("balance",)
