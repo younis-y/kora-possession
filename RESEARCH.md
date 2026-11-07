@@ -540,6 +540,12 @@ windows inside one half, batch 16, 3000 steps, AdamW (one-cycle learning rate to
 0.01). Each half of an evaluation copy is predicted as one sequence. torch 2.15.0, a research
 dependency (not in `requirements.txt` unless promoted; its test is skipped without it).
 
+**Amended 2026-11-07 13:28, after one network fit and before any score.** The first queue was stopped
+because GroupNorm normalised over the whole window, so a 1024-frame training window and a whole half at
+prediction would see different statistics. Now each frame is normalised over its channels (LayerNorm),
+the loss counts only frames whose whole +-255-frame receptive field lies inside the window, and windows
+are 2048 frames. Nothing else changed.
+
 **Candidates (pre-registered 2026-11-07).** `y16_seeds` with stage 1 = (1 - w) x the three tree members'
 average + w x the network: w = 0.25 (`y22_quarter`, the network as a fourth equal member), 0.5
 (`y22_half`), 1.0 (`y22_only`). The detector, prior and decoder selection are rerun on the blend

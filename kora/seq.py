@@ -5,14 +5,16 @@ The trees see each frame through window averages; a short possession is an order
 one team between touches by the other) that averages blur. Dilated, non-causal 1-D convolutions over the
 feature columns can read that order (receptive field +-255 frames, about 10 s). Trained on the same
 degraded training copies and balance weights as the trees; inputs standardised on the training copies,
-NaN set to 0; windows never cross a half.
+NaN set to 0; windows never cross a half. Normalisation is per frame and the loss counts only frames whose
+whole receptive field lies inside the training window, so a whole half can be predicted in one pass with
+the same statistics as in training.
 """
 import numpy as np
 
 from .train import balance_weights
 
 SETTINGS = {"channels": 64, "blocks": 8, "kernel": 3, "dropout": 0.1, "steps": 3000, "batch": 16,
-            "length": 1024, "lr": 2e-3, "weight_decay": 1e-2}
+            "length": 2048, "lr": 2e-3, "weight_decay": 1e-2}
 
 
 def device():
@@ -20,16 +22,29 @@ def device():
     return torch.device("mps" if torch.backends.mps.is_available() else "cpu")
 
 
+def radius(s):
+    """Frames of context the network reads on each side."""
+    return (s["kernel"] // 2) * (2 ** s["blocks"] - 1)
+
+
 def network(n_in, s):
     import torch
     from torch import nn
+
+    class FrameNorm(nn.Module):               # LayerNorm over the channels of each frame
+        def __init__(self, ch):
+            super().__init__()
+            self.norm = nn.LayerNorm(ch)
+
+        def forward(self, x):
+            return self.norm(x.transpose(1, 2)).transpose(1, 2)
 
     class TCN(nn.Module):
         def __init__(self):
             super().__init__()
             ch, k = s["channels"], s["kernel"]
             self.inp = nn.Conv1d(n_in, ch, 1)
-            self.norms = nn.ModuleList(nn.GroupNorm(1, ch) for _ in range(s["blocks"]))
+            self.norms = nn.ModuleList(FrameNorm(ch) for _ in range(s["blocks"]))
             self.blocks = nn.ModuleList(
                 nn.Sequential(nn.Conv1d(ch, ch, k, padding=2 ** i * (k // 2), dilation=2 ** i), nn.GELU(),
                               nn.Dropout(s["dropout"]), nn.Conv1d(ch, ch, 1))
@@ -80,6 +95,7 @@ def fit(train_sets, halves, seed, lam=0.5, settings=None):
     opt = torch.optim.AdamW(net.parameters(), lr=s["lr"], weight_decay=s["weight_decay"])
     sched = torch.optim.lr_scheduler.OneCycleLR(opt, max_lr=s["lr"], total_steps=s["steps"], pct_start=0.1)
     size = np.array(starts, np.float64) + 1
+    r = radius(s)
     net.train()
     for _ in range(s["steps"]):
         pick = rng.choice(len(seqs), s["batch"], p=size / size.sum())
@@ -89,8 +105,9 @@ def fit(train_sets, halves, seed, lam=0.5, settings=None):
             x, y, w = seqs[j]
             xs.append(x[:, a:a + s["length"]]); ys.append(y[a:a + s["length"]]); ws.append(w[a:a + s["length"]])
         x, y, w = torch.stack(xs).to(dev), torch.stack(ys).to(dev), torch.stack(ws).to(dev)
-        loss = torch.nn.functional.cross_entropy(net(x), y, reduction="none")
-        loss = (loss * w).sum() / w.sum()
+        inside = slice(r, s["length"] - r)
+        loss = torch.nn.functional.cross_entropy(net(x)[:, :, inside], y[:, inside], reduction="none")
+        loss = (loss * w[:, inside]).sum() / w[:, inside].sum()
         opt.zero_grad(set_to_none=True)
         loss.backward()
         opt.step()
