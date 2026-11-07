@@ -526,7 +526,7 @@ reuse the cached trees). Stage A runs for `y20_long` only (`y20_bag` failed its 
 
 **Outcome:** —
 
-### [pending] Y22: Does a temporal network over the frame features help as a stage-1 member? (S3)
+### [dropped] Y22: Does a temporal network over the frame features help as a stage-1 member? (S3)
 
 **Why (2026-11-07).** Swallowed short possessions are worth +0.17 (ceiling diagnosis, Y13), and inside
 them the trees' evidence is no stronger than their noise; decoder and feature changes since have moved
@@ -576,7 +576,14 @@ The network alone is worse than the trees, but blended in it helps: its errors d
 +0.0016, max +0.0186); spellF1 up at every IoU 0.3-0.7 (0.833 -> 0.842 at 0.3, 0.668 -> 0.677 at 0.7);
 recall under 1 s 0.320 -> 0.349, 1-2 s 0.557 -> 0.579; count ratio 0.898 -> 0.908. Heavy gaps,
 `y16_seeds_rand` -> `y22_quarter_rand`: 0.6783 -> 0.6836 (+0.0053, 4/7), inside V8. `y22_half` 0.7653
-(+0.0087, 5/7). So `y22_quarter` is the Stage A winner; Stage B (`y22_quarter_s2028`) is running.
+(+0.0087, 5/7); heavy gaps 0.6773 (-0.0011, 3/7), inside V8. So `y22_quarter` is the Stage A winner.
+
+**Stage B (2026-11-07 15:34): fails, so Y22 is not promoted.** With network seed 2028 the same blend,
+`y22_quarter_s2028`, scores 0.7577 against `y16_seeds` 0.7566 (+0.0011, median +0.0021), better on only 4
+of 7 (min -0.0076, max +0.0088); recall under 1 s 0.294. Against the seed-2027 run it is lower on all 7
+(-0.0096). Most of Stage A's +0.0107 was the luck of one network's seed: a single network on six matches
+is very seed-dependent. Y23's seed averages test whether a seed-robust gain remains (against
+`y16_seeds`, as its rule says when Stage B fails).
 
 ### [pending] Y23: Does averaging the temporal network over seeds, or a larger one, add to Y22?
 
