@@ -187,9 +187,10 @@ def seq_stage1(data, evs, cfg, pairs=True):
     """Y22: the temporal network's probabilities {fv: {(excluded, k): P}} on every evaluation set in `evs`,
     one fit per excluded set (the 7 singles and, with `pairs`, the 21 pairs, each predicting both its
     matches) on this variant's training copies. Cached by the training copies' stage-1 key, kora/seq.py,
-    the settings and the seed, so a _rand twin reuses the fits."""
+    the settings and the seed, so a _rand twin reuses the fits. The tree classifier ("clf", Y20) is left out
+    of the key: it does not change the training copies the network sees (Y24 reuses Y23's fits)."""
     from pathlib import Path
-    key = stage1_version(eval_config(False)) + "q" + _hash(
+    key = stage1_version({k: v for k, v in eval_config(False).items() if k != "clf"}) + "q" + _hash(
         [Path(seq.__file__).read_bytes(), json.dumps(cfg.get("settings", {}), sort_keys=True), str(cfg["seed"])])
     sets = [frozenset([m]) for m in MATCHES] + [frozenset(p) for p in itertools.combinations(MATCHES, 2) if pairs]
     name = lambda ex, k: k if ex == {k} else f"{k}_x{''.join(sorted(ex - {k}))}"

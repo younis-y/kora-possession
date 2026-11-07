@@ -625,6 +625,23 @@ its independent seed). Also recorded: `y23_seeds3` 0.7641 (+0.0075, 7/7, min +0.
 
 **Outcome:** —
 
+### [pending] Y24: Do the Y20 trees and the Y23 network add up?
+
+**Why (2026-11-07).** Y20 (`y20_long`, more capacity in the trees) and Y23 (a temporal network blended
+into stage 1) change different parts of stage 1, so if both pass, their gains may add.
+
+**Candidate (pre-registered 2026-11-07 19:35, before Y21's result and before Y23's winner is known).**
+Only if `y21_long` passes Y20's Stage B and Y23 has a winner: `y24` = `y21_long`'s three tree members
+with Y23's winning network(s) blended exactly as in Y23 (weight 0.25). No new fits: both parents'
+caches are reused (the network's cache key leaves out the tree classifier, which does not change its
+training copies).
+
+**Decision rule.** Against the better parent (the larger mean delta against `y16_seeds`): keep rule
+(mean up, at least 5 of 7) and the `_rand` twin not lower by more than 0.01 (V8). If it passes, `y24` is
+production; if not, the better parent is. If only one parent passes, that parent is production.
+
+**Outcome:** —
+
 ## Vladymyr — error metrics and decoder
 
 ### [verified] V1: Are possessions merged, split, or miscounted?

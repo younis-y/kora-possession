@@ -65,6 +65,15 @@ class Y22Tests(unittest.TestCase):
         self.assertGreater(variant.BIG["length"], 2 * 511)
         self.assertEqual(variant.stage1_version(V["y23_big"]), variant.stage1_version(V["y16_seeds"]))
 
+    def test_network_key_ignores_the_tree_classifier(self):
+        from kora import nested
+        V = variant.VARIANTS
+        keys = []
+        for cfg in (V["y23_seeds2"], {**V["y21_long"], "seq": V["y23_seeds2"]["seq"]}):
+            with mock.patch.dict(nested.CONFIG, cfg, clear=True):
+                keys.append(variant.stage1_version({k: v for k, v in nested.eval_config(False).items() if k != "clf"}))
+        self.assertEqual(keys[0], keys[1])
+
     @unittest.skipUnless(HAS["torch"], "torch not installed (Y22 research dependency)")
     def test_tiny_fit_predicts_probabilities_per_half(self):
         rng = np.random.default_rng(1)
