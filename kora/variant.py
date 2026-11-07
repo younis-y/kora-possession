@@ -83,6 +83,9 @@ Y20 = {"lgbm": LGBM, "long": {**LGBM, "n_estimators": 1000, "learning_rate": 0.0
 for _k, _clf in Y20.items():
     VARIANTS[f"y20_{_k}"] = {**VARIANTS["mixed"], "clf": _clf}
     VARIANTS[f"y20_{_k}_rand"] = {**VARIANTS["mixed_rand"], "clf": _clf}
+# RESEARCH.md Y20 Stage B: the Stage A winner as a three-member ensemble exactly as Y16.
+VARIANTS["y21_long"] = {**VARIANTS["y20_long"], "ensemble": [2027, 2028, 2029]}
+VARIANTS["y21_long_rand"] = {**VARIANTS["y20_long_rand"], "ensemble": [2027, 2028, 2029]}
 # RESEARCH.md Y22 (pre-registered 2026-11-07): Y16 + the temporal network (kora/seq.py) blended into stage 1,
 # (1 - weight) x trees + weight x network. One set of network fits serves every weight and the _rand twins;
 # _s2028 is the second-seed check of the network.
