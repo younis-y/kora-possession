@@ -603,6 +603,13 @@ Each is `y22_quarter` (network weight 0.25) with one change; nothing else is tri
 seed, `y23_big_s2028`, to pass the same checks. The winner is the passer with the largest mean delta. If
 Y22's Stage B fails, the same rules are applied against `y16_seeds` / `y16_seeds_rand` instead.
 
+**Amended 2026-11-07 16:13, after `y23_seeds2`'s result and before any other Y23 result: one more,
+stricter check.** Y22 showed one network seed can carry the whole gain, and both seed averages include
+seed 2027. So the winning seed average must also pass the same rule with a disjoint set of network
+seeds of the same size, starting at 2030 (`y23_seeds2r`: 2030, 2031; `y23_seeds3r`: 2030-2032). This can
+only block a promotion. `y23_seeds2` so far: 0.7566 -> 0.7646 (+0.0080, 6/7), heavy gaps 0.6783 ->
+0.6859 (+0.0076, 5/7).
+
 **Outcome:** —
 
 ## Vladymyr — error metrics and decoder

@@ -95,7 +95,8 @@ for _seed, _tag in ((2027, ""), (2028, "_s2028")):
 # (receptive field +-511 frames); _big_s2028 is the larger network's second-seed check.
 BIG = {"channels": 96, "blocks": 9, "length": 3072, "batch": 12}
 for _k, _sq in (("seeds2", {"seeds": [2027, 2028]}), ("seeds3", {"seeds": [2027, 2028, 2029]}),
-                ("big", {"settings": BIG}), ("big_s2028", {"seed": 2028, "settings": BIG})):
+                ("big", {"settings": BIG}), ("big_s2028", {"seed": 2028, "settings": BIG}),
+                ("seeds2r", {"seeds": [2030, 2031]}), ("seeds3r", {"seeds": [2030, 2031, 2032]})):   # replicates
     _sq = {"weight": 0.25, "seed": 2027, "settings": {}, **_sq}
     VARIANTS[f"y23_{_k}"] = {**VARIANTS["y16_seeds"], "seq": _sq}
     VARIANTS[f"y23_{_k}_rand"] = {**VARIANTS["y16_seeds_rand"], "seq": _sq}
