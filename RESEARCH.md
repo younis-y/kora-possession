@@ -189,7 +189,7 @@ J6 rule 2 reads `python -m kora.compare touch_bal mixed`. The committed submissi
 `touch_bal` on 2026-11-05 (commit 7007d78). The all-match CV kept the plain decoder there, because the
 detector improved fewer than 5 of 7 matches.
 
-### [pending] Y7: Do a stage-2 refiner, a wider grid, dwell features or stronger balancing recover short possessions? (Y7a, Y7c, Y8a, Y8b)
+### [dropped] Y7: Do a stage-2 refiner, a wider grid, dwell features or stronger balancing recover short possessions? (Y7a, Y7c, Y8a, Y8b)
 
 **Hypothesis:** on R2's held-out predictions, missed possessions under 2 s are still the largest
 error (oracle headroom +0.11). In 46% of them stage 1 has the right team on most frames but the decoder
@@ -239,9 +239,14 @@ possessions under 1 s fell from 0.621 (169 predicted) to 0.565 (216 predicted). 
 possessions of 1–2 s, precision fell from 0.670 to 0.615. The 1,000-draw paired-possession
 bootstrap (seed 0) gave a 5th–95th interval of −0.0104 to +0.0035 for spellF1 difference.
 The interval is descriptive and does not establish equivalence. Future work on short-possession
-recall should also preserve precision. The remaining Y7/Y8 outcomes are pending.
+recall should also preserve precision.
 
-### [pending] Y10: Do cuts at detector peaks recover swallowed short possessions?
+**Outcome (2026-11-05, recorded 2026-11-07 from `~/kora-runs/compare_*.log`):** all dropped against
+`touch_bal` (0.7528). `y7a_refine` 0.7415 (-0.0114), better on 0 of 7, recall under 1 s 0.268 -> 0.245,
+count ratio 0.870 -> 0.846 (the refiner smooths). `y7c_wide` 0.7547 (+0.0019, median 0), better on 3 of 7.
+`y8b_bal1` 0.7500 (-0.0028), better on 2 of 7, recall under 1 s 0.268 -> 0.305 but count ratio 0.902.
+
+### [dropped] Y10: Do cuts at detector peaks recover swallowed short possessions?
 
 **Hypothesis:** every decoder pays the same switching cost for a 0.5 s possession as for a 30 s one,
 so short possessions inside the other team's spell are swallowed. 48% of R2's misses are covered
@@ -271,7 +276,10 @@ both rise for a follow-up; the count ratio; and `kora.errors --compare` interval
 
 **Deployment** (`kora.run` with the all-7 detector) is added only if Y10 passes.
 
-**Outcome:** —
+**Outcome (2026-11-05, recorded 2026-11-07 from `~/kora-runs/compare_y10_cuts.log`):** dropped.
+`kora.compare mixed y10_cuts`: 0.7511 -> 0.7549 (+0.0038, median +0.0017), better on 4 of 7 (min
+-0.0028, max +0.0155); spellF1 up at every IoU 0.3-0.7; recall under 1 s 0.263 -> 0.305, count ratio
+0.879 -> 0.897. The closest to passing at the time, and the reason for the ceiling diagnosis below.
 
 ### [dropped] Y11, Y12: Do mirror averaging and weak-touch peaks help on top of production?
 
