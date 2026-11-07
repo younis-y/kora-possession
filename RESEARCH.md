@@ -428,7 +428,7 @@ Secondary: recall under 1 s and 1-2 s, count ratio. If kept, `kora.train`, `kora
 better on 3 of 7, though recall under 1 s rises 0.195 -> 0.221 and the count ratio 0.819 -> 0.850. With
 the members averaged, Y15's +0.0065 shrinks to +0.0016: most of it was the seed noise Y16 removes.
 
-### [pending] Y19: Do SkillCorner's possession events give usable H/A/D labels?
+### [dropped] Y19: Do SkillCorner's possession events give usable H/A/D labels?
 
 **Why (2026-11-07).** The seven IDSSE matches are both the training set and the only test set, and one
 seed swing (~0.018, Y11) is larger than most candidate deltas, so the keep rule has been deciding on
@@ -474,7 +474,17 @@ each candidate fitted on all seven IDSSE matches, decoded with its IDSSE-chosen 
 nested IDSSE folds and on SkillCorner held out by match. If it fails, the reason is recorded and
 SkillCorner stays missingness-only.
 
-**Outcome:** —
+**Outcome (2026-11-07, dc8cf28, clean checkout, `models/gate_y19.json`):** fails G1 and G2, so
+SkillCorner stays missingness-only and neither follow-up runs. The event labels are coarser than
+IDSSE's possession: 136 H/A spells per 45 minutes against 206 (ratio 0.66, bound 0.67) and a median
+spell of 5.7 s against 3.8 s (1.52, bound 1.5); the dead share (0.50 against 0.45) and the unknown
+share (0.06) are within bounds. They agree with SkillCorner's own per-frame possession group on 0.856
+of the frames where both name a team (bound 0.90). G3 passes: the shipped model scores 0.503 with team
+accuracy 0.916, but predicts 1,339 spells against 848 labelled (1.58 times; 0.90 on IDSSE). So most of
+the shortfall is the labels missing short possessions that IDSSE marks, which is the error we are trying
+to fix; as a test set they would reward swallowing them. G4 (reported only): `y16_seeds` 0.503, `mixed`
+0.452, `touch_bal` 0.458. Mixed is not ahead of touch_bal on these real gaps, and the ensemble's lead
+comes partly from predicting fewer spells (1,339 against 1,491), which these labels reward.
 
 ### [pending] Y20: Does another stage-1 classifier, or more capacity, help?
 
