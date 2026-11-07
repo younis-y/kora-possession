@@ -449,6 +449,12 @@ team when the start type is an `*_interception`). A live gap longer than `FLIGHT
 aligned by the `match_periods` start frames and checked against the tracking rows per period. The
 constants are football timing (pass flight, restart), not fitted.
 
+**Amended 2026-11-07 13:20, after the first gate run stopped at its alignment check, before any
+verdict.** 1899585's tracking ends at frame 60529, one frame before its `match_periods` end frame 60530,
+so the per-period row check raised. Rows are now placed by their own tracking frame number (`frames`,
+read once from the JSONL); for the other two gate matches the mapping is unchanged. That run had already
+printed the G1-G3 statistics of 1874553 and 1886347. No label rule or threshold changed.
+
 **Gate (pre-registered 2026-11-07, `python -m kora.scgate`, writes `models/gate_y19.json`).** It reads
 only `GATE` = 1874553, 1886347, 1899585 (the first three in `kora.skillcorner` order); the other 17 are
 not scored until it passes.

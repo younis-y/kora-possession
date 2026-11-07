@@ -180,18 +180,36 @@ def label_events(meta, events):
     return np.concatenate(labels)
 
 
+def frames(match):
+    """Tracking frame number of every row of raw(match), cached (raw() keeps the rows of periods 1 and 2)."""
+    cache = cache_dir() / f"skillcorner_frames_{match}.npy"
+    if cache.exists():
+        return np.load(cache)
+    with open(ext_dir() / f"{match}_tracking_extrapolated.jsonl", encoding="utf-8") as f:
+        fr = np.array([r["frame"] for r in map(json.loads, f) if r["period"] in (1, 2)], np.int64)
+    if len(fr) != len(raw(match)["half"]):
+        raise ValueError(f"SkillCorner {match}: {len(fr)} period rows in the JSONL, {len(raw(match)['half'])} cached")
+    np.save(cache, fr)
+    return fr
+
+
 def events_label(match):
-    """Y19 labels for the rows of raw(match), checked against its frames per period."""
+    """Y19 labels for the rows of raw(match), placed by each row's own tracking frame number (1899585's
+    tracking ends one frame before its match_periods end frame)."""
     import pandas as pd
     meta = json.loads(fetch(match, f"{match}_match.json").read_text(encoding="utf-8"))
     lab = label_events(meta, pd.read_csv(fetch(match, f"{match}_dynamic_events.csv"), low_memory=False))
-    half = raw(match)["half"]
-    want = [int((half == h).sum()) for h in (1, 2)]
-    got = [p["end_frame"] - p["start_frame"] + 1 for p in sorted(meta["match_periods"], key=lambda p: p["period"])
-           if p["period"] in (1, 2)]
-    if want != got:
-        raise ValueError(f"SkillCorner {match}: {got} event frames per period, {want} tracking rows")
-    return lab
+    half, fr = raw(match)["half"], frames(match)
+    out, offset = np.full(len(half), UNKNOWN, np.int8), 0
+    for p in sorted((p for p in meta["match_periods"] if p["period"] in (1, 2)), key=lambda p: p["period"]):
+        rows, n = half == p["period"], p["end_frame"] - p["start_frame"] + 1
+        rel = fr[rows] - p["start_frame"]
+        if len(rel) and (rel.min() < 0 or rel.max() >= n):
+            raise ValueError(f"SkillCorner {match}: period {p['period']} rows outside frames "
+                             f"{p['start_frame']}-{p['end_frame']}")
+        out[rows] = lab[offset + rel]
+        offset += n
+    return out
 
 
 def load(match, fps=25, events=False):
