@@ -30,6 +30,11 @@ least 5 of the 7 matches improve.
 | player-only model fused in ball gaps | dropped | the main model was already as accurate inside gaps (85.8% vs 84.4% team accuracy) |
 | wider decoder grid, boundary bonus on team changes only | dropped | on B0: 0.7143 and 0.7146 vs 0.7147 (better on 0/7 and 1/7 matches). The wider grid chose B0's settings in 6 of 7 folds and the bonus change altered 51 frames, and neither candidate passed the registered keep rule on B0 (`RESEARCH.md` V5, V6) |
 | separate costs for entering and leaving dead ball | dropped before testing | stoppages and restarts alternate within a half: with the total cost, endpoint states and same-state continuation penalties fixed, changing the split between the two cannot change the preferred internal boundaries (`RESEARCH.md` V6) |
+| stage-2 refiner, wider decoder grid, dwell features, full possession balancing | dropped | on R2 (0.7528): 0.7415 (0/7), 0.7547 (3/7), 0.7492 (3/7), 0.7500 (2/7) (`RESEARCH.md` Y7, Y8) |
+| priority for team-change detector targets | dropped | 0.7574 on R2 but 4/7 with two ties; again on the mixed model 0.7528 vs 0.7511, 3/7 (`RESEARCH.md` V7) |
+| cuts at detector peaks, mirror averaging, weak-touch peaks | dropped | on the mixed model (0.7511): 0.7549 (4/7), 0.7553 (4/7), 0.7497 (3/7) (`RESEARCH.md` Y10-Y12) |
+| touch-event model relabelling short spells | dropped | its gate passed (it finds 80 of 470 swallowed possessions where the detector finds 62), but relabelling scored 0.7521 vs 0.7511, 1/7 (`RESEARCH.md` Y13, Y14) |
+| filling short ball gaps | dropped | 0.7576 vs 0.7511 (4/7) alone; 0.7582 vs 0.7566 (3/7) on the submitted ensemble, so most of its gain was seed noise (`RESEARCH.md` Y15, Y18) |
 
 ## 3. Training data (all from other games)
 
@@ -70,6 +75,15 @@ training copy therefore draws a severity s ~ U(0, 1) that scales every process, 
 (s = 0) to SkillCorner broadcast (s = 1). The model sees the whole range and is tuned on none of
 the challenge tracking.
 
+**Ball gaps that carry no label information (mixed training, `RESEARCH.md` J6).** In the camera-on
+estimate the ball goes missing mostly during stoppages, so a model can learn "ball missing means dead
+ball". Half the training copies (the odd ones) therefore lose the ball at random instead: gaps with
+SkillCorner's every-frame lengths, placed uniformly in each half without looking at the labels, until
+SkillCorner's every-frame missing share (40%) is spent. A second set of evaluation copies masked the
+same way (the "heavy-gap" copies) is scored for every candidate since. Under heavy gaps a model
+trained without this loses 0.180 spellF1 (0.7528 to 0.5726); mixed training recovers about half of it
+on every match (0.6607, 7/7) at a cost of 0.0017 on the normal copies.
+
 ## 5. Features (permutation-invariant, orientation-canonical, missing-aware)
 
 Track slots carry no identity, so every feature is a team-level aggregate: nearest and second-nearest
@@ -95,6 +109,10 @@ velocity change in free flight during IDSSE live play, set without possession la
 - **Classifier:** gradient-boosted trees (scikit-learn `HistGradientBoostingClassifier`, 3 classes).
   Frames are weighted so that every possession counts about equally, as it does in spellF1, instead of
   long possessions dominating (weight (1 − λ) + λ · mean length / possession length, λ = 0.5).
+- **Three members, averaged (`RESEARCH.md` Y16).** The submission averages the probabilities of three
+  classifiers whose degraded training copies and fits use seeds 2027, 2028 and 2029. One seed alone
+  moves held-out spellF1 by up to ~0.018, more than most candidate changes, so the average is both a
+  better model and a steadier baseline for later comparisons.
 - **Change detector:** a second model predicts, from windows of the classifier's out-of-fold
   probabilities and a few raw signals, whether a team change, a live/dead change or no change is
   within 0.2 s. Only its team-change probability is used.
@@ -104,8 +122,11 @@ velocity change in free flight during IDSSE live play, set without possession la
   team-change probability in the segment's first block and rate is the share of training frames
   whose detector target is a team change. Switching costs apply to a change of
   possession and to entering or leaving dead ball. A plain HMM Viterbi is the alternative. Which
-  decoder and which costs are used is chosen inside the training folds only: in R2 the semi-Markov
-  decoder is chosen on 4 of the 7 held-out matches and the plain one on 3.
+  decoder and which costs are used is chosen inside the training folds only: for the submitted
+  ensemble, nested cross-validation picks the semi-Markov decoder on 5 of the 7 held-out matches. The
+  submission build applies the same kind of rule once, over all seven matches (`kora/boundary.py`:
+  the semi-Markov decoder only if it wins on at least 5 of 7), and there it did not, so the submission
+  uses the plain decoder (switching costs 8 for a change of possession and 32 for dead ball).
 
 ## 7. Possession rules implemented
 
@@ -125,25 +146,38 @@ they are learned tendencies, not hard constraints:
 
 ## 8. Results (nested cross-validation on the seven training matches)
 
-| variant | spellF1 | change vs B0 | matches better |
-|---|---:|---:|---:|
+| variant | spellF1 | heavy ball gaps | vs previous row |
+|---|---:|---:|---|
 | B0: compliant baseline | 0.7147 ± 0.0234 | | |
-| R1: + touch features | 0.7432 ± 0.0325 | +0.0284 | 6/7 |
-| **R2: + touch features + balanced weights (submitted)** | **0.7528 ± 0.0279** | **+0.0381** | **7/7** |
+| R1: + touch features | 0.7432 ± 0.0325 | | +0.0284, 6/7 better |
+| R2: + balanced weights | 0.7528 ± 0.0279 | 0.5726 | +0.0096, 6/7 |
+| J6: + mixed training | 0.7511 ± 0.0270 | 0.6607 | −0.0017; heavy gaps +0.0881, 7/7 |
+| **Y16: + three seed members (submitted)** | **0.7566 ± 0.0300** | **0.6783** | **+0.0055, 5/7; heavy gaps +0.0176, 6/7** |
 
-R2 also beats R1 on 6 of 7 matches. Recall of true possessions under 1 s rose from 0.21 (B0) to 0.27,
-and for 1-2 s from 0.44 to 0.54. Each held-out match is excluded from the classifier, the detector,
-the duration prior and decoder selection, and scored once.
+Each held-out match is excluded from the classifier, the detector, the duration prior and decoder
+selection, and scored once. "Heavy ball gaps" scores the same models on evaluation copies with
+label-free random ball gaps at 40% (section 4). With the plain decoder on every fold, as submitted,
+the ensemble scores 0.7554 (heavy gaps 0.6749). Recall of true possessions under 1 s rose from 0.21
+(B0) to 0.32, and for 1-2 s from 0.44 to 0.56; spellF1 at IoU 0.3 / 0.5 / 0.7 is 0.833 / 0.765 / 0.668.
 
 ## 9. Limitations
 
-- **Short possessions are still the main error.** Inserting the true possessions under 2 s that we
-  miss would add about +0.11 spellF1; perfect team assignment per predicted possession would add
-  +0.04, and boundaries snapped to within 1 s +0.01.
-- **The validation sees few ball gaps.** Evaluation copies are degraded with the camera-on estimate
-  (about 6% of the ball missing), while the challenge ball is missing on 41% of graded frames, so
-  nested CV says little about long gaps. A separate stress test with label-free random gaps at the
-  every-frame share is reported in `RESEARCH.md` J6.
+- **Short possessions are still the main error.** On the mixed model's held-out predictions
+  (`kora/ceiling.py`), fixing the swallowed possessions perfectly (true possessions covered on less than
+  half their frames) would raise spellF1 from 0.751 to 0.918, fixing every possession under 2 s to
+  0.861, but snapping every boundary within 0.5 s of a predicted change only to 0.766. Inside the
+  swallowed possessions the ball is visible 99% of the time, yet the frame classifier prefers the true
+  team on at least half their frames in only 16% of them: its evidence there is no stronger than its
+  noise. That is why decoder changes moved the score by less than 0.005 (section 2).
+- **Seed noise is as large as most changes.** One seed alone moves held-out spellF1 by up to ~0.018,
+  so a single-seed comparison can pass or fail the 5-of-7 rule by chance. The submitted three-seed
+  average reduces this for later comparisons: the short ball-gap fill, +0.0065 on one seed, shrank
+  to +0.0016 on the average (`RESEARCH.md` Y15, Y18).
+- **The validation sees few ball gaps.** Normal evaluation copies are degraded with the camera-on
+  estimate (about 6% of the ball missing), while the challenge ball is missing on 41% of graded
+  frames. Every candidate since J6 is therefore also scored on heavy-gap copies (40% missing at
+  random, section 8). Degrading the whole evaluation copy, players included, at full SkillCorner
+  broadcast severity scores 0.630 for the mixed model (`RESEARCH.md` V8, report only).
 - **Where the errors are (R2, `RESEARCH.md` V1–V4).** R2 predicts 13.5% too few possessions. Of
   the 891 true possessions missed at IoU 0.5, 426 (48%) are covered on at least half their frames by
   opposite-team predictions, most of them shorter than 2 s, 411 (46%) by same-team predictions
@@ -168,8 +202,9 @@ the duration prior and decoder selection, and scored once.
 ```bash
 ./build.sh                                     # venv, download, train, decode, check; fails on a hash mismatch
 .venv/bin/python -m kora.run --out "Kora Analytics.csv"   # submission from the committed models
-.venv/bin/python -m kora.nested --variant touch_bal       # nested cross-validation of the submitted variant
-.venv/bin/python -m kora.compare b0 touch_bal             # paired comparison with the baseline
+.venv/bin/python -m kora.nested --variant mixed           # single-seed base (about 1-2 h; folds are cached)
+.venv/bin/python -m kora.nested --variant y16_seeds       # nested cross-validation of the submitted ensemble
+.venv/bin/python -m kora.compare mixed y16_seeds          # paired comparison, with the keep rule
 ```
 
 Match data is gated and never committed; `data/` and every derived array are gitignored.
