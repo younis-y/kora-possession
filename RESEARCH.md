@@ -395,7 +395,7 @@ Secondary: recall and precision under 2 s, `kora.errors --compare`, and the seed
 0.6607 -> 0.6783 (+0.0176), better on 6 of 7; recall under 1 s 0.167 -> 0.195. Both well inside the V8
 condition. Next: fit the three members in `kora.train`/`kora.run` for the submission.
 
-### [open] Y18: Does the short ball-gap fill help on top of the seed ensemble?
+### [dropped] Y18: Does the short ball-gap fill help on top of the seed ensemble?
 
 **Why (2026-11-07).** Y15's fill raised the mean (+0.0065, heavy gaps +0.0026) but was better on only
 4 of 7 matches. Single-seed stage 1 is noisy enough to flip a match by ~0.01 (Y16's members), so a
@@ -413,6 +413,12 @@ else will be tried.
 ships only if `kora.compare y16_seeds_rand y18_fill_rand` does not lose more than 0.01 on the mean (V8).
 Secondary: recall under 1 s and 1-2 s, count ratio. If kept, `kora.train`, `kora.ensemble` and
 `kora.run` apply the fill for the submission.
+
+**Outcome (2026-11-07, cdc2ae0, clean checkout):** dropped. `kora.compare y16_seeds y18_fill`: 0.7566 ->
+0.7582 (+0.0016, median -0.0005), better on 3 of 7 (min -0.0075, max +0.0139); recall under 1 s 0.320 ->
+0.326, 1-2 s 0.557 -> 0.548. Heavy gaps, `kora.compare y16_seeds_rand y18_fill_rand`: 0.6783 -> 0.6782,
+better on 3 of 7, though recall under 1 s rises 0.195 -> 0.221 and the count ratio 0.819 -> 0.850. With
+the members averaged, Y15's +0.0065 shrinks to +0.0016: most of it was the seed noise Y16 removes.
 
 ## Vladymyr — error metrics and decoder
 
