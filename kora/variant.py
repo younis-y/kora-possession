@@ -67,6 +67,10 @@ VARIANTS = {
     # "ensemble" is not a feature or training key, so member 2027 is production's own stage-1 cache.
     "y16_seeds": {"touch": True, "balance": 0.5, "mixed": True, "ensemble": [2027, 2028, 2029]},
     "y16_seeds_rand": {"touch": True, "balance": 0.5, "mixed": True, "eval_rand": True, "ensemble": [2027, 2028, 2029]},
+    # RESEARCH.md Y18 (pre-registered 2026-11-07): Y16 + Y15's short ball-gap fill in every member.
+    "y18_fill": {"touch": True, "balance": 0.5, "mixed": True, "fill": True, "ensemble": [2027, 2028, 2029]},
+    "y18_fill_rand": {"touch": True, "balance": 0.5, "mixed": True, "eval_rand": True, "fill": True,
+                      "ensemble": [2027, 2028, 2029]},
 }
 PRODUCTION = "y16_seeds"                              # Y16: 5/7 over mixed, heavy gaps 6/7 (was mixed, J6)
 FEATURE_KEYS = ("touch", "mixed", "eval_rand")

@@ -21,6 +21,15 @@ class KeyTests(unittest.TestCase):
         self.assertNotIn(variant.stage1_version(V["mixed"]), keys)
         self.assertEqual(variant.feature_version({**V["mixed"], "seed": 2028}), variant.feature_version(V["mixed_s2028"]))
 
+    def test_y18_base_member_is_y15_cache_and_members_are_filled(self):
+        V = variant.VARIANTS
+        self.assertEqual(variant.stage1_version(V["y18_fill"]), variant.stage1_version(V["y15_fill"]))
+        self.assertEqual(variant.stage1_version(V["y18_fill_rand"]), variant.stage1_version(V["y15_fill_rand"]))
+        with mock.patch.dict(nested.CONFIG, V["y18_fill_rand"], clear=True):
+            with nested.member(2028) as key:
+                self.assertTrue(train.CONFIG["fill"])
+                self.assertNotEqual(key, variant.stage1_version({**V["mixed"], "seed": 2028}))
+
     def test_member_sets_and_restores_train_globals(self):
         before = train.SEED, train.CONFIG, train.FEATURE_VERSION
         with mock.patch.dict(nested.CONFIG, {"eval_rand": True, "ensemble": [2027, 2028]}):

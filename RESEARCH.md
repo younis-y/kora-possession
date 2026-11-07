@@ -395,6 +395,25 @@ Secondary: recall and precision under 2 s, `kora.errors --compare`, and the seed
 0.6607 -> 0.6783 (+0.0176), better on 6 of 7; recall under 1 s 0.167 -> 0.195. Both well inside the V8
 condition. Next: fit the three members in `kora.train`/`kora.run` for the submission.
 
+### [open] Y18: Does the short ball-gap fill help on top of the seed ensemble?
+
+**Why (2026-11-07).** Y15's fill raised the mean (+0.0065, heavy gaps +0.0026) but was better on only
+4 of 7 matches. Single-seed stage 1 is noisy enough to flip a match by ~0.01 (Y16's members), so a
+small real gain can fail the 5-of-7 rule; averaging three members lowers that noise. The fill also
+targets the challenge match's 41% missing ball, which Y16 does not. Y11's mirror averaging, the other
+near-passer, is left out: it is the same kind of variance reduction the members already give.
+
+**Candidate (pre-registered 2026-11-07, before any filled member is fitted).** `y18_fill` = `y16_seeds`
+with `kora/fill.py` (unchanged since Y15) applied to every copy of every member: gaps under 25 frames
+inside a half, both ends seen, filled linearly, plus `b_filled`. Seeds 2027 / 2028 / 2029 and equal
+weights as in Y16; member 2027 is `y15_fill`'s own stage-1 cache. Nothing else changes and nothing
+else will be tried.
+
+**Decision rule:** `kora.compare y16_seeds y18_fill` (mean up and at least 5 of 7 matches better). It
+ships only if `kora.compare y16_seeds_rand y18_fill_rand` does not lose more than 0.01 on the mean (V8).
+Secondary: recall under 1 s and 1-2 s, count ratio. If kept, `kora.train`, `kora.ensemble` and
+`kora.run` apply the fill for the submission.
+
 ## Vladymyr — error metrics and decoder
 
 ### [verified] V1: Are possessions merged, split, or miscounted?
