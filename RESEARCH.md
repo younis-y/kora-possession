@@ -518,6 +518,12 @@ from one run (the training copies are the same), so the V8 check costs no fits.
 4. `y20_lgbm` with no gain: if it passes the screen and Stage A is within -0.003 on the mean, LightGBM
    becomes the engine for later experiments (twice as fast), not production by itself.
 
+**Amended 2026-11-07 14:42, for compute, before `y20_deep`'s screen result.** Under the current load a
+`y20_deep` fit takes about 14 minutes, so its Stage A (42 more fits) would take about 7 hours; its screen
+was stopped after 4 of 7 fits, before any score, and it gets no Stage A in this round. `y20_lgbm`'s
+Stage A is not run either: no later experiment in this round needs a faster tree engine (Y22 and Y23
+reuse the cached trees). Stage A runs for `y20_long` only (`y20_bag` failed its screen).
+
 **Outcome:** —
 
 ### [pending] Y22: Does a temporal network over the frame features help as a stage-1 member? (S3)
