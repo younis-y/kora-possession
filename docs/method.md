@@ -35,6 +35,7 @@ least 5 of the 7 matches improve.
 | cuts at detector peaks, mirror averaging, weak-touch peaks | dropped | on the mixed model (0.7511): 0.7549 (4/7), 0.7553 (4/7), 0.7497 (3/7) (`RESEARCH.md` Y10-Y12) |
 | touch-event model relabelling short spells | dropped | its gate passed (it finds 80 of 470 swallowed possessions where the detector finds 62), but relabelling scored 0.7521 vs 0.7511, 1/7 (`RESEARCH.md` Y13, Y14) |
 | filling short ball gaps | dropped | 0.7576 vs 0.7511 (4/7) alone; 0.7582 vs 0.7566 (3/7) on the submitted ensemble, so most of its gain was seed noise (`RESEARCH.md` Y15, Y18) |
+| SkillCorner possession events as labels (20 more test matches) | dropped by a pre-registered gate | labels derived from its player-possession events are coarser than the possession scored here: 136 possessions per 45 minutes against IDSSE's 206, median 5.7 s against 3.8 s. As a test set they would reward missing short possessions (`RESEARCH.md` Y19) |
 
 ## 3. Training data (all from other games)
 
