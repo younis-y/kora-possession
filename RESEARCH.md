@@ -524,7 +524,12 @@ was stopped after 4 of 7 fits, before any score, and it gets no Stage A in this 
 Stage A is not run either: no later experiment in this round needs a faster tree engine (Y22 and Y23
 reuse the cached trees). Stage A runs for `y20_long` only (`y20_bag` failed its screen).
 
-**Outcome:** —
+**Outcome so far (2026-11-07, 63ea21d, clean checkout).** Screens against `mixed`'s outer folds (0.7516):
+`y20_lgbm` 0.7488 (-0.0028, 2/7: inside its -0.003 bar), `y20_bag` 0.7521 (+0.0004, 3/7: out),
+`y20_long` 0.7555 (+0.0038, 5/7); `y20_deep` stopped before any score (amendment). Stage A for
+`y20_long`: `kora.compare mixed y20_long` 0.7511 -> 0.7576 (+0.0065, median +0.0050), better on 5 of 7
+(min -0.0052, max +0.0213); recall under 1 s 0.263 -> 0.307; heavy gaps `mixed_rand` -> `y20_long_rand`
+0.6607 -> 0.6670 (+0.0063, 5/7). So it passes Stage A; Stage B (`y21_long`) is running.
 
 ### [dropped] Y22: Does a temporal network over the frame features help as a stage-1 member? (S3)
 
