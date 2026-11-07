@@ -17,6 +17,7 @@ With decoder "refine" (Y7a) a stage-2 model re-reads windows of the stage-1 prob
 probabilities replace stage 1's in both decoders; it is fitted on the same folds as the detector.
 
     python -m kora.nested --variant b0     # a few hours on first run (stage-1 folds are cached)
+    python -m kora.nested --variant y20_lgbm --screen   # Y20: outer folds only, vs the base's cached ones
 
 Writes models/nested_<variant>.json (settings and scores per fold, committed) and
 models/nested_<variant>_predictions.npz (schema-1 bundle for `kora.errors --predictions`, gitignored).
@@ -34,7 +35,7 @@ import numpy as np
 from joblib import Parallel, delayed
 
 from .boundary import GRID, RAW, context, model as detector, runs_of, target
-from . import dwell, events, fill, peaks
+from . import dwell, engine, events, fill, peaks
 from .cuts import relabel
 from . import train as _train
 from .data import cache_dir
@@ -62,15 +63,18 @@ def scores(y, pred, half):
     return pm.spell_scores(gt, pr, pm.valid_runs(gt))
 
 
-def stage1(data, excluded, k, mirrored=None):
+def stage1(data, excluded, k, mirrored=None, twin=None):
     """Stage-1 probabilities on k from a classifier trained without any match in `excluded` (k included).
 
     With `mirrored` (Y11) they are averaged with the same classifier's H/A-swapped probabilities on k's
-    mirrored evaluation copy; those are cached beside the plain ones under the same stage-1 key."""
+    mirrored evaluation copy; those are cached beside the plain ones under the same stage-1 key.
+    With `twin` (Y20: (stage-1 key, {match: X})) the same classifier also predicts k's heavy-gap evaluation
+    copy, cached under the _rand twin's key: its training copies are this variant's (kora.train._copies)."""
     name = k if excluded == {k} else f"{k}_x{''.join(sorted(excluded - {k}))}"
     path = cache_dir() / f"oof_{STAGE1_VERSION}_{name}.npy"           # {k} alone is kora.train's own fold
     mpath = path.with_name(f"{path.stem}_mirror.npy")
-    if path.exists() and (mirrored is None or mpath.exists()):
+    tpath = twin and cache_dir() / f"oof_{twin[0]}_{name}.npy"
+    if path.exists() and (mirrored is None or mpath.exists()) and (twin is None or tpath.exists()):
         p = np.load(path)
     else:
         clf = fit_classifier([s for j in MATCHES if j not in excluded for s in data[j][0]])
@@ -79,6 +83,8 @@ def stage1(data, excluded, k, mirrored=None):
             np.save(path, p)
         if mirrored is not None:
             np.save(mpath, clf.predict_proba(mirrored[k].to_numpy()))
+        if twin is not None:
+            np.save(tpath, clf.predict_proba(twin[1][k].to_numpy()))
     return p if mirrored is None else (p + np.load(mpath)[:, [1, 0, 2]]) / 2
 
 
@@ -217,14 +223,42 @@ def cut_scores(paths, P, C, y, half, theta, gap):
     return [scores(y[k], relabel(paths[k], P[k], C[k], half[k], theta, gap), half[k])["mean_f1"] for k in paths]
 
 
+def screen(outer, y, half, labels):
+    """Y20 screen: kora.train's plain-decoder pick (best mean over the seven outer folds, so leaky like
+    kora.train) for this variant and for its base, mixed or mixed_rand, from the base's cached outer folds on
+    the same evaluation copies. Writes models/screen_<variant>.json."""
+    base = "mixed_rand" if CONFIG.get("eval_rand") else "mixed"
+    if feature_version(VARIANTS[base]) != FEATURE_VERSION:
+        raise SystemExit(f"{NAME} and {base} must share their evaluation copies")
+    key = stage1_version(VARIANTS[base])
+    P0 = {m: np.load(cache_dir() / f"oof_{key}_{m}.npy") for m in MATCHES}
+    prior = np.bincount(np.concatenate([labels[m] for m in MATCHES]), minlength=3) / sum(map(len, labels.values()))
+
+    def best(P):
+        s = np.array(Parallel(n_jobs=-1)(delayed(plain_scores)(P, y, half, prior, g) for g in PLAIN))
+        i = int(s.mean(1).argmax())
+        return s[i], PLAIN[i]
+    (b, gb), (c, gc) = best(P0), best(outer)
+    commit = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
+    out = {"variant": NAME, "base": base, "commit": commit, "stage1_version": STAGE1_VERSION,
+           "base_mean": float(b.mean()), "mean": float(c.mean()), "delta": float((c - b).mean()),
+           "wins": int((c > b).sum()), "base_decoder": gb, "decoder": gc,
+           "per_match": {m: [float(x), float(z)] for m, x, z in zip(MATCHES, b, c)}}
+    (MODELS / f"screen_{NAME}.json").write_text(json.dumps(out, indent=2))
+    print(f"screen {base} {b.mean():.4f} -> {NAME} {c.mean():.4f}  delta {out['delta']:+.4f}  better on "
+          f"{out['wins']}/7  decoders {gb} / {gc}", flush=True)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--variant", default=NAME, choices=VARIANTS, help="read at import by kora.variant")
-    parser.parse_args()
+    parser.add_argument("--screen", action="store_true", help="Y20: outer folds only, scored against the base")
+    args = parser.parse_args()
     if CONFIG.get("seed"):             # read at call time by kora.train (copies, classifier)
         _train.SEED = CONFIG["seed"]
     if CONFIG.get("fill"):             # Y15: kora.train builds every copy through this (train.py unchanged, keys kept)
         _train.build = fill.wrap(_train.build)
+    engine.use(CONFIG)                 # Y20: the variant's stage-1 classifier, same way
     t0 = time.time()
     print(f"variant {NAME} {CONFIG}  features {FEATURE_VERSION}  stage 1 {STAGE1_VERSION}", flush=True)
     data = {m: copies(m) for m in MATCHES}
@@ -247,12 +281,17 @@ def main():
     tgt = {m: target(y[m], half[m], **DETECTOR_CFG) for m in MATCHES}
 
     # 1. stage-1 predictions: outer (kora.train folds) and inner (without m and k)
-    outer = {m: stage1(data, {m}, m, mirrored) for m in MATCHES}
+    twin = None
+    if CONFIG.get("clf") and not CONFIG.get("eval_rand") and not CONFIG.get("ensemble"):   # Y20
+        twin = (stage1_version({**CONFIG, "eval_rand": True}), eval_copies(True)[1])
+    outer = {m: stage1(data, {m}, m, mirrored, twin) for m in MATCHES}
+    if args.screen:
+        return screen(outer, y, half, labels)
     inner = {}
     for m in MATCHES:
         for k in MATCHES:
             if k != m:
-                inner[m, k] = stage1(data, {m, k}, k, mirrored)
+                inner[m, k] = stage1(data, {m, k}, k, mirrored, twin)
                 print(f"stage 1 without {m}, {k} ({time.time() - t0:.0f} s)", flush=True)
     del data, mirrored
     if CONFIG.get("ensemble"):         # Y16: equal-weight average with the other members' stage 1

@@ -72,7 +72,18 @@ VARIANTS = {
     "y18_fill_rand": {"touch": True, "balance": 0.5, "mixed": True, "eval_rand": True, "fill": True,
                       "ensemble": [2027, 2028, 2029]},
 }
-PRODUCTION = "y16_seeds"                              # Y16: 5/7 over mixed, heavy gaps 6/7 (was mixed, J6)
+# RESEARCH.md Y20 (pre-registered 2026-11-07): mixed with another stage-1 classifier (kora/engine.py), each
+# alone. A _rand twin is the same fits scored on the heavy-gap evaluation copies (kora.nested caches both).
+LGBM = {"kind": "lgbm", "n_estimators": 250, "learning_rate": 0.1, "num_leaves": 63, "min_child_samples": 200,
+        "reg_lambda": 1.0}
+Y20 = {"lgbm": LGBM, "long": {**LGBM, "n_estimators": 1000, "learning_rate": 0.05},
+       "deep": {**LGBM, "n_estimators": 500, "learning_rate": 0.05, "num_leaves": 255, "min_child_samples": 100},
+       "bag": {**LGBM, "n_estimators": 500, "learning_rate": 0.05, "colsample_bytree": 0.5, "subsample": 0.8,
+               "subsample_freq": 1}}
+for _k, _clf in Y20.items():
+    VARIANTS[f"y20_{_k}"] = {**VARIANTS["mixed"], "clf": _clf}
+    VARIANTS[f"y20_{_k}_rand"] = {**VARIANTS["mixed_rand"], "clf": _clf}
+PRODUCTION = "y16_seeds"                           # Y16: 5/7 over mixed, heavy gaps 6/7 (was mixed, J6)
 FEATURE_KEYS = ("touch", "mixed", "eval_rand")
 TRAIN_KEYS = ("balance",)
 
@@ -138,6 +149,8 @@ def stage1_version(config=CONFIG):
     for key in ("dwell", "peaks"):     # Y8a, Y12, added later: keyed only when on, so older caches keep their names
         if config.get(key):
             parts.append((ROOT / "kora" / f"{key}.py").read_bytes())
+    if config.get("clf"):              # Y20, same
+        parts += [(ROOT / "kora" / "engine.py").read_bytes(), json.dumps(config["clf"], sort_keys=True)]
     return feature_version(config) + "s" + _hash(parts)
 
 

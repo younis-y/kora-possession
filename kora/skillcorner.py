@@ -6,6 +6,12 @@ SkillCorner. Used for what IDSSE cannot show: how automatic tracking really lose
 players (`is_detected`). Its per-frame `possession.group` is SkillCorner's own output, with unknown
 provenance, so it is an H/A label at most and never a dead-ball label.
 
+Y19 adds H/A/D labels from SkillCorner's dynamic events (`events_label`): each player possession
+belongs to its team; a gap between two possessions stays with the team that last had the ball, is dead
+if a game interruption is flagged on either side of it, and is unknown if it is live and longer than
+FLIGHT_S (no possession event to anchor it). Before the first and after the last possession of a
+period is unknown.
+
     python -m kora.skillcorner        # download (if missing) and verify every match
 """
 import json
@@ -21,6 +27,10 @@ RAW = "https://raw.githubusercontent.com/SkillCorner/opendata/{}/data/matches/{}
 LFS = "https://media.githubusercontent.com/media/SkillCorner/opendata/{}/data/matches/{}/{}"
 FPS_SOURCE = 10
 UNKNOWN = 3   # label code for frames with no possession group (pm.X)
+GATE = ("1874553", "1886347", "1899585")   # Y19: the label gate reads only these; the rest wait for its verdict
+FLIGHT_S = 4.0    # Y19: a live gap longer than this between two possessions is unknown
+OUT_S = 0.5       # Y19: after the last touch before an interruption the ball is still travelling (that team's)
+RESTART_S = 1.0   # Y19: the restart before the first possession after an interruption is in the air
 
 MATCHES = {   # match id: SHA-256 of {id}_tracking_extrapolated.jsonl (git LFS oid at COMMIT)
     "1874553": "ea97f58f8eaad925feaeacc6395ec24860dd80027af8a89450276adebd29d265",
@@ -60,12 +70,16 @@ def sha256(path):
     return h.hexdigest()
 
 
+def fetch(match, name, url=RAW):
+    p = ext_dir() / name
+    if not p.exists() or p.stat().st_size == 0:
+        subprocess.run(["curl", "-sfL", "--retry", "3", "-o", str(p), url.format(COMMIT, match, name)], check=True)
+    return p
+
+
 def download(match):
-    for name, url in ((f"{match}_match.json", RAW), (f"{match}_tracking_extrapolated.jsonl", LFS)):
-        p = ext_dir() / name
-        if not p.exists() or p.stat().st_size == 0:
-            subprocess.run(["curl", "-sfL", "--retry", "3", "-o", str(p),
-                            url.format(COMMIT, match, name)], check=True)
+    fetch(match, f"{match}_match.json")
+    fetch(match, f"{match}_tracking_extrapolated.jsonl", LFS)
     got = sha256(ext_dir() / f"{match}_tracking_extrapolated.jsonl")
     if got != MATCHES[match]:
         raise ValueError(f"SkillCorner {match}: SHA-256 {got} does not match the pinned commit")
@@ -137,9 +151,54 @@ def resample(d, fps):
     return res
 
 
-def load(match, fps=25):
-    """The external.load() contract at `fps`: half, players (metres, centre origin), team, ball[n, 2], label."""
-    return resample(raw(match), fps)
+def label_events(meta, events):
+    """Y19: H/A/D/unknown (0/1/2/3) for every frame of periods 1 and 2, in order, from the player-possession
+    rows of SkillCorner's dynamic events (frame_start and frame_end inclusive, tracking frame numbers)."""
+    home = meta["home_team"]["id"]
+    pos = events[events["event_type"] == "player_possession"].sort_values("frame_start")
+    flight, out_, restart_ = (round(s * FPS_SOURCE) for s in (FLIGHT_S, OUT_S, RESTART_S))
+    labels = []
+    for per in sorted((p for p in meta["match_periods"] if p["period"] in (1, 2)), key=lambda p: p["period"]):
+        f0 = per["start_frame"]
+        lab = np.full(per["end_frame"] - f0 + 1, UNKNOWN, np.int8)
+        prev = None                                    # (end, team, interruption after) of the last possession
+        for r in pos[pos["period"] == per["period"]].itertuples(index=False):
+            a, b = max(r.frame_start - f0, 0), min(r.frame_end - f0 + 1, len(lab))
+            team = 0 if r.team_id == home else 1
+            if prev is not None and a > prev[0]:
+                end, last = prev[0], prev[1]
+                if isinstance(prev[2], str) or isinstance(r.game_interruption_before, str):
+                    restart = 1 - team if str(r.start_type).endswith("_interception") else team
+                    lab[end:a] = 2
+                    lab[end:min(end + out_, a)] = last
+                    lab[max(a - restart_, min(end + out_, a)):a] = restart
+                elif a - end <= flight:
+                    lab[end:a] = last
+            lab[a:b] = team
+            prev = (b, team, r.game_interruption_after)
+        labels.append(lab)
+    return np.concatenate(labels)
+
+
+def events_label(match):
+    """Y19 labels for the rows of raw(match), checked against its frames per period."""
+    import pandas as pd
+    meta = json.loads(fetch(match, f"{match}_match.json").read_text(encoding="utf-8"))
+    lab = label_events(meta, pd.read_csv(fetch(match, f"{match}_dynamic_events.csv"), low_memory=False))
+    half = raw(match)["half"]
+    want = [int((half == h).sum()) for h in (1, 2)]
+    got = [p["end_frame"] - p["start_frame"] + 1 for p in sorted(meta["match_periods"], key=lambda p: p["period"])
+           if p["period"] in (1, 2)]
+    if want != got:
+        raise ValueError(f"SkillCorner {match}: {got} event frames per period, {want} tracking rows")
+    return lab
+
+
+def load(match, fps=25, events=False):
+    """The external.load() contract at `fps`: half, players (metres, centre origin), team, ball[n, 2], label.
+    The label is SkillCorner's per-frame possession group (H/A/unknown), or with `events` Y19's H/A/D/unknown."""
+    d = raw(match)
+    return resample({**d, "label": events_label(match)} if events else d, fps)
 
 
 if __name__ == "__main__":

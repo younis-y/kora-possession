@@ -420,6 +420,82 @@ Secondary: recall under 1 s and 1-2 s, count ratio. If kept, `kora.train`, `kora
 better on 3 of 7, though recall under 1 s rises 0.195 -> 0.221 and the count ratio 0.819 -> 0.850. With
 the members averaged, Y15's +0.0065 shrinks to +0.0016: most of it was the seed noise Y16 removes.
 
+### [pending] Y19: Do SkillCorner's possession events give usable H/A/D labels?
+
+**Why (2026-11-07).** The seven IDSSE matches are both the training set and the only test set, and one
+seed swing (~0.018, Y11) is larger than most candidate deltas, so the keep rule has been deciding on
+noise (Y10, Y11, Y15, Y18). SkillCorner's open data (MIT, used since Y5 for missingness) also ships
+dynamic events for its 20 A-League matches: about 960 timed player possessions per match, with start
+and end types and game-interruption flags. If labels derived from them fit the possession the challenge
+scores, the 20 matches give 27 test matches, and real rather than simulated tracking gaps for training.
+Risks: the events are SkillCorner's own detection on broadcast tracking, possession runs touch to
+touch, dead time has to be inferred, and the source is 10 fps.
+
+**Labels (fixed 2026-11-07, before any statistic of them was computed).** `kora/skillcorner.py`
+`events_label`: each player possession [frame_start, frame_end] belongs to its team. The gap to the next
+possession stays with the team that had the ball last, unless a game interruption is flagged after the
+first or before the second; then it is dead, except its first `OUT_S` = 0.5 s (the ball still travelling,
+last team) and its last `RESTART_S` = 1.0 s (the restart in the air: the receiving team, or the other
+team when the start type is an `*_interception`). A live gap longer than `FLIGHT_S` = 4 s is unknown
+(X, not scored), as are the frames before a period's first and after its last possession. Frames are
+aligned by the `match_periods` start frames and checked against the tracking rows per period. The
+constants are football timing (pass flight, restart), not fitted.
+
+**Gate (pre-registered 2026-11-07, `python -m kora.scgate`, writes `models/gate_y19.json`).** It reads
+only `GATE` = 1874553, 1886347, 1899585 (the first three in `kora.skillcorner` order); the other 17 are
+not scored until it passes.
+- G1, labels against IDSSE (no model): dead share of labelled frames within 0.30-0.60; H/A spells per
+  45 minutes and median spell length each within 0.67-1.5 times the IDSSE mean; unknown at most 0.15 of
+  frames.
+- G2, alignment: on frames both call H or A, the event label agrees with SkillCorner's per-frame
+  `possession.group` on at least 0.90.
+- G3, the shipped model (`y16_seeds`, de873a7 models, its plain decoder, trained on IDSSE only): mean
+  spellF1 at least 0.45 on the three, and team accuracy at least 0.80 on frames both call H or A.
+- Pass = G1, G2 and G3. Reported, not gated (G4): member 2027 alone (`mixed`) against `touch_bal`
+  fitted on all seven, same decoder. Heavy simulated gaps ranked mixed far above (J6: +0.088).
+
+**If it passes**, each step pre-registered on its own: (1) the 17 others become extra test matches:
+each candidate fitted on all seven IDSSE matches, decoded with its IDSSE-chosen decoder, scored on the
+20, paired, beside the 7 nested deltas; (2) then SkillCorner as training data (real gaps), scored on the
+nested IDSSE folds and on SkillCorner held out by match. If it fails, the reason is recorded and
+SkillCorner stays missingness-only.
+
+**Outcome:** —
+
+### [pending] Y20: Does another stage-1 classifier, or more capacity, help?
+
+**Why (2026-11-07).** Stage 1 still uses the day-one HistGradientBoosting settings (250 trees, learning
+rate 0.1, 63 leaves, at least 200 rows per leaf), and every fit runs all 250 iterations, so its early
+stopping never fires: it may be capacity-limited. A timing check (no scores) on one six-match fold: HGB
+60 s, LightGBM with the same settings 28 s, train-set argmax agreement 0.988. A faster stage 1 also
+halves the cost of every later run.
+
+**Candidates (pre-registered 2026-11-07, before any candidate is fitted).** Each alone on top of
+`mixed`, through `kora/engine.py` (LightGBM 4.7.0, deterministic, column-wise); nothing else will be
+tried in this round.
+- `y20_lgbm`: LightGBM with the same settings (250 trees, 0.1, 63 leaves, min 200, L2 1.0).
+- `y20_long`: 1000 trees at 0.05.
+- `y20_deep`: 500 trees at 0.05, 255 leaves, min 100.
+- `y20_bag`: 500 trees at 0.05, half the features and 80% of the rows per tree (the seed now matters).
+
+Each `_rand` twin is the same fits scored on the heavy-gap evaluation copies; `kora.nested` caches both
+from one run (the training copies are the same), so the V8 check costs no fits.
+
+**Decision rule.**
+1. Screen, `kora.nested --variant <c> --screen` (the seven outer fits, reused by step 2): kora.train's
+   plain-decoder pick on the outer folds, against `mixed`'s cached folds scored the same way. A
+   candidate goes on if the mean delta is at least +0.002 (`y20_lgbm`: at least -0.003).
+2. Stage A, full nested: `kora.compare mixed <c>` keep rule (mean up, at least 5 of 7), and
+   `kora.compare mixed_rand <c>_rand` not lower by more than 0.01 (V8).
+3. Stage B, the second-seed check: the Stage A winner (largest mean delta if several) as a three-member
+   ensemble exactly as Y16, `y21` = winner + seeds 2027 / 2028 / 2029: `kora.compare y16_seeds y21` keep
+   rule, and `y16_seeds_rand y21_rand` not lower by more than 0.01. Promoted only if Stage A and Stage B
+   both pass; the build then fits the same classifier.
+4. `y20_lgbm` with no gain: if it passes the screen and Stage A is within -0.003 on the mean, LightGBM
+   becomes the engine for later experiments (twice as fast), not production by itself.
+
+**Outcome:** —
+
 ## Vladymyr — error metrics and decoder
 
 ### [verified] V1: Are possessions merged, split, or miscounted?
