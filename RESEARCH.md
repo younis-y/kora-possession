@@ -520,6 +520,45 @@ from one run (the training copies are the same), so the V8 check costs no fits.
 
 **Outcome:** —
 
+### [pending] Y22: Does a temporal network over the frame features help as a stage-1 member? (S3)
+
+**Why (2026-11-07).** Swallowed short possessions are worth +0.17 (ceiling diagnosis, Y13), and inside
+them the trees' evidence is no stronger than their noise; decoder and feature changes since have moved
+the score by less than 0.007. The trees see each frame through window averages, while a short
+possession is an ordered pattern (a touch by one team between touches by the other). S3 proposed a
+shallow temporal convolutional network over the existing features; Y19 closed the SkillCorner route,
+so it runs now. A timing check (no scores): 250 steps on one six-match fold take 6 s on the laptop's
+GPU (MPS), a prediction of one evaluation copy 0.3 s.
+
+**Model (fixed 2026-11-07, before any fit is scored), `kora/seq.py`.** Input: the 204 frame columns,
+standardised on the training copies, NaN set to 0, clipped to +-10. A 1x1 convolution to 64 channels,
+8 residual blocks (GroupNorm, dilated non-causal convolution with kernel 3 and dilation 2^i, GELU,
+dropout 0.1, 1x1 convolution), receptive field +-255 frames (about 10 s), then a 1x1 convolution to H/A/D
+logits. Trained on the variant's own training copies (those of `mixed`, seed 2027: degraded, randomly
+gapped and mirrored as for the trees) with the trees' balance weights (lambda 0.5): random 1024-frame
+windows inside one half, batch 16, 3000 steps, AdamW (one-cycle learning rate to 2e-3, weight decay
+0.01). Each half of an evaluation copy is predicted as one sequence. torch 2.15.0, a research
+dependency (not in `requirements.txt` unless promoted; its test is skipped without it).
+
+**Candidates (pre-registered 2026-11-07).** `y16_seeds` with stage 1 = (1 - w) x the three tree members'
+average + w x the network: w = 0.25 (`y22_quarter`, the network as a fourth equal member), 0.5
+(`y22_half`), 1.0 (`y22_only`). The detector, prior and decoder selection are rerun on the blend
+unchanged. One set of 28 network fits (7 singles and 21 pairs, each pair predicting both its matches, as
+Y16's members) serves all three weights and both evaluation sets. Nothing else is tried in this round.
+
+**Decision rule.**
+1. Screen, `kora.nested --variant y22_<w> --screen` (the 7 single fits): kora.train's plain-decoder pick
+   on the seven outer folds, the blend against the same run's tree-only outer folds (that is,
+   `y16_seeds`). A candidate goes on if the mean delta is at least +0.002.
+2. Stage A, full nested: `kora.compare y16_seeds y22_<w>` keep rule (mean up, at least 5 of 7), and
+   `kora.compare y16_seeds_rand y22_<w>_rand` not lower by more than 0.01 (V8).
+3. Stage B, the second seed: the Stage A winner (largest mean delta if several) refitted with network
+   seed 2028 (`y22_<w>_s2028`) must pass the same two checks against the same bases. Promoted only if
+   Stage A and Stage B both pass; the build then fits the network on all seven matches and `kora.run`
+   blends it.
+
+**Outcome:** —
+
 ## Vladymyr — error metrics and decoder
 
 ### [verified] V1: Are possessions merged, split, or miscounted?

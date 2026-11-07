@@ -35,7 +35,7 @@ import numpy as np
 from joblib import Parallel, delayed
 
 from .boundary import GRID, RAW, context, model as detector, runs_of, target
-from . import dwell, engine, events, fill, peaks
+from . import dwell, engine, events, fill, peaks, seq
 from .cuts import relabel
 from . import train as _train
 from .data import cache_dir
@@ -183,6 +183,31 @@ def member_stage1(seed, evs, pairs=True):
     return {fv: {(ex, k): np.load(path(fv, ex, k)) for ex in sets for k in ex} for fv in evs}
 
 
+def seq_stage1(data, evs, cfg, pairs=True):
+    """Y22: the temporal network's probabilities {fv: {(excluded, k): P}} on every evaluation set in `evs`,
+    one fit per excluded set (the 7 singles and, with `pairs`, the 21 pairs, each predicting both its
+    matches) on this variant's training copies. Cached by the training copies' stage-1 key, kora/seq.py,
+    the settings and the seed, so a _rand twin reuses the fits."""
+    from pathlib import Path
+    key = stage1_version(eval_config(False)) + "q" + _hash(
+        [Path(seq.__file__).read_bytes(), json.dumps(cfg.get("settings", {}), sort_keys=True), str(cfg["seed"])])
+    sets = [frozenset([m]) for m in MATCHES] + [frozenset(p) for p in itertools.combinations(MATCHES, 2) if pairs]
+    name = lambda ex, k: k if ex == {k} else f"{k}_x{''.join(sorted(ex - {k}))}"
+    path = lambda fv, ex, k: cache_dir() / f"seq_{key}_e{fv}_{name(ex, k)}.npy"
+    half = {m: data[m][1][2] for m in MATCHES}
+    for ex in sets:
+        if all(path(fv, ex, k).exists() for fv in evs for k in ex):
+            continue
+        train = [(s, half[j]) for j in MATCHES if j not in ex for s in data[j][0]]
+        model = seq.fit([s for s, _ in train], [h for _, h in train], cfg["seed"], CONFIG.get("balance") or 0.0,
+                        cfg.get("settings"))
+        for fv, X in evs.items():
+            for k in ex:
+                np.save(path(fv, ex, k), seq.predict(model, X[k], half[k]))
+        print(f"  seq {cfg['seed']}: without {', '.join(sorted(ex))}", flush=True)
+    return {fv: {(ex, k): np.load(path(fv, ex, k)) for ex in sets for k in ex} for fv in evs}
+
+
 def event_scores(paths, E, y, half, theta, max_len):
     return [scores(y[k], events.relabel(paths[k], E[k], half[k], theta, max_len), half[k])["mean_f1"] for k in paths]
 
@@ -223,15 +248,17 @@ def cut_scores(paths, P, C, y, half, theta, gap):
     return [scores(y[k], relabel(paths[k], P[k], C[k], half[k], theta, gap), half[k])["mean_f1"] for k in paths]
 
 
-def screen(outer, y, half, labels):
+def screen(outer, y, half, labels, P0=None):
     """Y20 screen: kora.train's plain-decoder pick (best mean over the seven outer folds, so leaky like
     kora.train) for this variant and for its base, mixed or mixed_rand, from the base's cached outer folds on
-    the same evaluation copies. Writes models/screen_<variant>.json."""
-    base = "mixed_rand" if CONFIG.get("eval_rand") else "mixed"
-    if feature_version(VARIANTS[base]) != FEATURE_VERSION:
-        raise SystemExit(f"{NAME} and {base} must share their evaluation copies")
-    key = stage1_version(VARIANTS[base])
-    P0 = {m: np.load(cache_dir() / f"oof_{key}_{m}.npy") for m in MATCHES}
+    the same evaluation copies. Y22 passes P0, the same run's outer folds before the temporal network is
+    blended in. Writes models/screen_<variant>.json."""
+    base = f"{NAME} without seq" if P0 is not None else "mixed_rand" if CONFIG.get("eval_rand") else "mixed"
+    if P0 is None:
+        if feature_version(VARIANTS[base]) != FEATURE_VERSION:
+            raise SystemExit(f"{NAME} and {base} must share their evaluation copies")
+        key = stage1_version(VARIANTS[base])
+        P0 = {m: np.load(cache_dir() / f"oof_{key}_{m}.npy") for m in MATCHES}
     prior = np.bincount(np.concatenate([labels[m] for m in MATCHES]), minlength=3) / sum(map(len, labels.values()))
 
     def best(P):
@@ -285,14 +312,18 @@ def main():
     if CONFIG.get("clf") and not CONFIG.get("eval_rand") and not CONFIG.get("ensemble"):   # Y20
         twin = (stage1_version({**CONFIG, "eval_rand": True}), eval_copies(True)[1])
     outer = {m: stage1(data, {m}, m, mirrored, twin) for m in MATCHES}
-    if args.screen:
+    if args.screen and not CONFIG.get("seq"):
         return screen(outer, y, half, labels)
     inner = {}
     for m in MATCHES:
         for k in MATCHES:
-            if k != m:
+            if k != m and not args.screen:
                 inner[m, k] = stage1(data, {m, k}, k, mirrored, twin)
                 print(f"stage 1 without {m}, {k} ({time.time() - t0:.0f} s)", flush=True)
+    if CONFIG.get("seq"):              # Y22: fitted while the training copies are loaded, blended in below
+        seqP = seq_stage1(data, dict(eval_copies(r) for r in (False, True)), CONFIG["seq"],
+                          pairs=not args.screen)[FEATURE_VERSION]
+        print(f"temporal network done ({time.time() - t0:.0f} s)", flush=True)
     del data, mirrored
     if CONFIG.get("ensemble"):         # Y16: equal-weight average with the other members' stage 1
         base, *others = CONFIG["ensemble"]
@@ -300,12 +331,18 @@ def main():
         if base != _train.SEED or FEATURE_VERSION not in evs:
             raise SystemExit("the first ensemble seed must be production's and the evaluation copies its own")
         for s in others:
-            p = member_stage1(s, evs)[FEATURE_VERSION]
+            p = member_stage1(s, evs, pairs=not args.screen)[FEATURE_VERSION]
             outer = {m: outer[m] + p[frozenset([m]), m] for m in MATCHES}
             inner = {(m, k): v + p[frozenset([m, k]), k] for (m, k), v in inner.items()}
             print(f"member {s} added ({time.time() - t0:.0f} s)", flush=True)
         outer = {m: v / len(CONFIG["ensemble"]) for m, v in outer.items()}
         inner = {mk: v / len(CONFIG["ensemble"]) for mk, v in inner.items()}
+    if CONFIG.get("seq"):              # Y22: (1 - w) x trees + w x temporal network
+        w, trees = CONFIG["seq"]["weight"], outer
+        outer = {m: (1 - w) * v + w * seqP[frozenset([m]), m] for m, v in outer.items()}
+        inner = {(m, k): (1 - w) * v + w * seqP[frozenset([m, k]), k] for (m, k), v in inner.items()}
+        if args.screen:
+            return screen(outer, y, half, labels, P0=trees)
 
     # 2. per outer match: detector folds on the inner matches, then the detector for m
     ctx = {(m, k): context(inner[m, k], raw[k]) for m, k in inner}

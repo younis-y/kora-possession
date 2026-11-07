@@ -83,6 +83,14 @@ Y20 = {"lgbm": LGBM, "long": {**LGBM, "n_estimators": 1000, "learning_rate": 0.0
 for _k, _clf in Y20.items():
     VARIANTS[f"y20_{_k}"] = {**VARIANTS["mixed"], "clf": _clf}
     VARIANTS[f"y20_{_k}_rand"] = {**VARIANTS["mixed_rand"], "clf": _clf}
+# RESEARCH.md Y22 (pre-registered 2026-11-07): Y16 + the temporal network (kora/seq.py) blended into stage 1,
+# (1 - weight) x trees + weight x network. One set of network fits serves every weight and the _rand twins;
+# _s2028 is the second-seed check of the network.
+for _seed, _tag in ((2027, ""), (2028, "_s2028")):
+    for _k, _w in (("quarter", 0.25), ("half", 0.5), ("only", 1.0)):
+        VARIANTS[f"y22_{_k}{_tag}"] = {**VARIANTS["y16_seeds"], "seq": {"weight": _w, "seed": _seed, "settings": {}}}
+        VARIANTS[f"y22_{_k}{_tag}_rand"] = {**VARIANTS["y16_seeds_rand"],
+                                            "seq": {"weight": _w, "seed": _seed, "settings": {}}}
 PRODUCTION = "y16_seeds"                           # Y16: 5/7 over mixed, heavy gaps 6/7 (was mixed, J6)
 FEATURE_KEYS = ("touch", "mixed", "eval_rand")
 TRAIN_KEYS = ("balance",)
