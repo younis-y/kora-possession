@@ -610,6 +610,14 @@ seeds of the same size, starting at 2030 (`y23_seeds2r`: 2030, 2031; `y23_seeds3
 only block a promotion. `y23_seeds2` so far: 0.7566 -> 0.7646 (+0.0080, 6/7), heavy gaps 0.6783 ->
 0.6859 (+0.0076, 5/7).
 
+**Amended 2026-11-07 18:28, after `y23_big`'s normal-copy result (0.7669, +0.0103, 7/7) and before its
+heavy-gap and second-seed results: big cannot ship as a single network.** If `y23_big` and
+`y23_big_s2028` both pass, the candidate becomes their average, `y23_big2` (seeds 2027 and 2028, no new
+fits), which must pass the same rule; the winner is then the largest mean delta among the passing
+`y23_seeds2`, `y23_seeds3` and `y23_big2`. `y23_big2` needs no disjoint replicate (`y23_big_s2028` is
+its independent seed). Also recorded: `y23_seeds3` 0.7641 (+0.0075, 7/7, min +0.0026), heavy gaps 0.6808
+(+0.0025, 5/7): passes.
+
 **Outcome:** —
 
 ## Vladymyr — error metrics and decoder
