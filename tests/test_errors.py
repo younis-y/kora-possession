@@ -76,6 +76,11 @@ class ErrorChecks(unittest.TestCase):
                                         ("missed", reference["n_missed"]),
                                         ("false_predicted", reference["n_spurious"])):
                     self.assertEqual(sum(row[field] for row in v2.values()), expected)
+            for group in errors.DURATION_GROUPS:
+                visible = h["possession_visibility"][group]
+                recall = h["v2"][0.5][group]
+                self.assertEqual(visible["matched"]["possessions"], recall["matched"])
+                self.assertEqual(visible["unmatched"]["possessions"], recall["missed"])
             counts = h["associations"]["counts"]
             self.assertEqual(sum(x["true_spells"] for x in counts.values()), h["n_true"])
             self.assertEqual(sum(x["pred_spells"] for x in counts.values()), h["n_pred"])
@@ -234,6 +239,26 @@ class ErrorChecks(unittest.TestCase):
                     self.assertEqual(h["v2"][iou][group],
                                      {"support": 1, "matched": 1, "missed": 0, "predicted": 1,
                                       "matched_predicted": 1, "false_predicted": 0})
+
+    def test_possession_visibility_hand_counts_and_pooling(self):
+        first = self.analyse("HHHHDAA" + "H" * 25, "HHHHDDD" + "H" * 25,
+                             [1] * 7 + [2] * 25, [0, 1, 1, 1, 1, 0, 0] + [0] * 12 + [1] * 13)
+        second = self.analyse("HHD" + "A" * 25, "DDD" + "A" * 25,
+                              ball_seen=[0, 1, 0] + [0] * 13 + [1] * 12)
+        short = first["halves"][0]["possession_visibility"]["<1"]
+        self.assertEqual(short["matched"], dict(zip(errors.VISIBILITY_COUNT_FIELDS, (1, 4, 1, 1, 0))))
+        self.assertEqual(short["unmatched"], dict(zip(errors.VISIBILITY_COUNT_FIELDS, (1, 2, 2, 1, 1))))
+        # One missing frame out of two is a tie, not a majority.
+        self.assertEqual(second["halves"][0]["possession_visibility"]["<1"]["unmatched"]["majority_missing"], 0)
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            errors.print_report({"fps": 25, "provenance": "synthetic only"}, [("S", first), ("T", second)])
+        text = output.getvalue()
+        self.assertIn("| <1 | matched | 1 | 4 | 1 | 0.250 | 1 | 0 |", text)
+        self.assertIn("| <1 | unmatched | 2 | 4 | 3 | 0.750 | 2 | 1 |", text)
+        self.assertIn("| 1–2 | matched | 2 | 50 | 25 | 0.500 | 2 | 1 |", text)
+        self.assertIn("| 1–2 | unmatched | 0 | 0 | 0 | n/a | 0 | 0 |", text)
+        self.assertIn("| 0.5 | <1 | 3 | 1 | 2 | 0.333 |", text)
 
     def test_v2_pair_in_different_groups(self):
         for truth, pred, true_group, pred_group in (("H" * 24 + "D" * 6, "H" * 30, "<1", "1–2"),
@@ -836,6 +861,145 @@ class ErrorChecks(unittest.TestCase):
         arrays = {f"{match}__{field}": array for match, values in data.items()
                   for field, array in zip(errors.BUNDLE_ARRAYS, values)}
         np.savez(path, meta=json.dumps(meta), **arrays)
+
+    def seed_pairs_example(self):
+        predictions = [(["HHDDAA", "HHDDDD"], ["HHDDDD", "HHDDAA"]),
+                       (["HHDDAA", "HHDDAA"], ["HHDDDD", "HHDDDD"]),
+                       (["HHDDDD", "HHDDAA"], ["HHDDAA", "HHDDAA"])]
+        pairs = []
+        for seed, (candidate, base) in enumerate(predictions, 11):
+            pair = (self.comparison_bundle(candidate), self.comparison_bundle(base))
+            for meta, _ in pair:
+                meta["seed"] = seed
+            pairs.append(pair)
+        return pairs
+
+    def test_seed_pairs_hand_counted_scores(self):
+        pairs = self.seed_pairs_example()
+        for _, data in pairs[1]:
+            data["M0"][errors.BUNDLE_ARRAYS.index("ball_seen")][:] = False
+        result = errors.compare_seed_pairs(pairs, draws=53, seed=7)
+        expected = np.array([[1, -1], [1, 1], [-1, 0]]) / 3
+        np.testing.assert_allclose([row["differences"] for row in result["seeds"]], expected)
+        np.testing.assert_allclose([row["mean_difference"] for row in result["seeds"]], [0, 1 / 3, -1 / 6])
+        self.assertEqual([row["wins"] for row in result["seeds"]], [1, 2, 0])
+        self.assertAlmostEqual(result["mean_difference"], 1 / 18)
+        for row, (candidate, base) in zip(result["seeds"], pairs):
+            reference = errors.compare_bundles(base, candidate, draws=3)
+            self.assertEqual(row["differences"], [r["difference"] for r in reference["matches"]])
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            errors.print_seed_comparison(result)
+        self.assertIn("| 11 | +0.333333 | -0.333333 | +0.000000 | 1 / 2 |", output.getvalue())
+        self.assertIn("| MEAN OVER SEEDS | +0.111111 | +0.000000 | +0.055556 | n/a |", output.getvalue())
+        self.assertIn("Run seed (meta.seed)", output.getvalue())
+        self.assertIn("meta.seed is producer-stated", output.getvalue())
+        self.assertIn("descriptive", output.getvalue())
+
+    def test_seed_pairs_crossed_bootstrap_shares_match_draw(self):
+        first = errors.compare_seed_pairs(self.seed_pairs_example(), draws=137, seed=42)
+        self.assertEqual(first, errors.compare_seed_pairs(self.seed_pairs_example(), draws=137, seed=42))
+        deltas = [row["differences"] for row in first["seeds"]]
+        rng = np.random.RandomState(42)
+        means = []
+        for _ in range(137):
+            seeds = rng.randint(0, 3, 3)
+            matches = rng.randint(0, 2, 2)
+            means.append(np.mean([deltas[s][m] for s in seeds for m in matches]))
+        self.assertEqual(first["interval"], tuple(np.percentile(means, [5, 95])))
+
+    def test_seed_pairs_alignment_and_metadata_before_scoring(self):
+        for field in ("seed mismatch", "duplicate seed", "partial seed", "match order", "y_true", "half", "frame", "ball_seen"):
+            with self.subTest(field=field):
+                pairs = self.seed_pairs_example()
+                candidate, base = pairs[1]
+                if field == "seed mismatch":
+                    candidate[0]["seed"] = 99
+                    message = "seeds differ"
+                elif field == "duplicate seed":
+                    candidate[0]["seed"] = base[0]["seed"] = 11
+                    message = "duplicate seed"
+                elif field == "partial seed":
+                    candidate[0].pop("seed")
+                    message = "both bundles must record"
+                elif field == "match order":
+                    for meta, _ in pairs[1]:
+                        meta["matches"].reverse()
+                    message = "same order"
+                else:
+                    # Truth differs across seeds, while this pair remains aligned.
+                    bundles = pairs[1] if field == "y_true" else (candidate,)
+                    for _, data in bundles:
+                        data["M0"][errors.BUNDLE_ARRAYS.index(field)][0] += -1 if field == "ball_seen" else 1
+                    message = f"{field} arrays differ"
+                with mock.patch.object(errors, "_comparison_spells", side_effect=AssertionError("scored before pairing")):
+                    with self.assertRaisesRegex(ValueError, message):
+                        errors.compare_seed_pairs(pairs)
+
+    def test_seed_pairs_invalid_seed_metadata(self):
+        for value in (None, -1, True, 11.0, "11"):
+            with self.subTest(seed=value):
+                pairs = self.seed_pairs_example()
+                for meta, _ in pairs[0]:
+                    meta["seed"] = value
+                with self.assertRaisesRegex(ValueError, "non-negative integer meta.seed"):
+                    errors.compare_seed_pairs(pairs)
+
+    def test_seed_pairs_cross_pair_half_and_frame_mismatch(self):
+        for field in ("half", "frame"):
+            with self.subTest(field=field):
+                pairs = self.seed_pairs_example()
+                for _, data in pairs[1]:
+                    data["M0"][errors.BUNDLE_ARRAYS.index(field)][:] += 1
+                with mock.patch.object(errors, "_comparison_spells", side_effect=AssertionError("scored before pairing")):
+                    with self.assertRaisesRegex(ValueError, f"{field} arrays differ"):
+                        errors.compare_seed_pairs(pairs)
+
+    def run_seed_cli(self, paths, *extra):
+        return subprocess.run([sys.executable, "-B", "-m", "kora.errors", "--seed-pairs",
+                               *map(str, paths), *map(str, extra)],
+                              cwd=ROOT, capture_output=True, text=True, timeout=30)
+
+    def test_seed_pairs_cli_interval_floor_missing_seeds_and_refusals(self):
+        with tempfile.TemporaryDirectory() as directory:
+            pairs, paths = self.seed_pairs_example(), []
+            for index, pair in enumerate(pairs):
+                for side, bundle in zip(("candidate", "base"), pair):
+                    path = Path(directory, f"{side}_{index}.npz")
+                    self.save_comparison_bundle(path, bundle)
+                    paths.append(path)
+            for count in (1, 2, 3):
+                completed = self.run_seed_cli(paths[:2 * count], "--draws", 31, "--seed", 8)
+                self.assertEqual(completed.returncode, 0, completed.stderr)
+                self.assertEqual(completed.stderr, "")
+                self.assertIn("| 11 | +0.333333 | -0.333333 | +0.000000 | 1 / 2 |", completed.stdout)
+                self.assertIn("candidate provenance: synthetic only", completed.stdout)
+                self.assertIn("Combined interval refused" if count < 3 else "5th percentile", completed.stdout)
+                self.assertNotIn("918273", completed.stdout)
+            for meta, _ in pairs[0]:
+                meta.pop("seed")
+            for path, bundle in zip(paths[:2], pairs[0]):
+                self.save_comparison_bundle(path, bundle)
+            completed = self.run_seed_cli(paths[:2])
+            self.assertEqual(completed.returncode, 2)
+            self.assertIn("both bundles must record a non-negative integer meta.seed", completed.stderr)
+            self.assertNotIn("Traceback", completed.stderr)
+            self.assertNotIn("Mean delta", completed.stdout)
+            for value, message in ((99, "seeds differ"), (12, "duplicate seed")):
+                pairs[0][0][0]["seed"], pairs[0][1][0]["seed"] = value, 12
+                for path, bundle in zip(paths[:2], pairs[0]):
+                    self.save_comparison_bundle(path, bundle)
+                completed = self.run_seed_cli(paths)
+                self.assertEqual(completed.returncode, 2)
+                self.assertIn(message, completed.stderr)
+                self.assertNotIn("Traceback", completed.stderr)
+                self.assertNotIn("Mean delta", completed.stdout)
+            for extra_paths, extra_args in ((paths[:1], ()), (paths[:2], ("--compare", paths[1])),
+                                             (paths[:2], ("--predictions", paths[0])),
+                                             (paths[:2], ("--draws", 0)), (paths[:2], ("--seed", -1))):
+                completed = self.run_seed_cli(extra_paths, *extra_args)
+                self.assertEqual(completed.returncode, 2)
+                self.assertNotIn("Traceback", completed.stderr)
 
     def test_comparison_identical_bundles(self):
         base, _ = self.paired_example()
