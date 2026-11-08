@@ -62,8 +62,49 @@ VARIANTS = {
                    "decoder": {"events": {"theta": [0.1, 0.15, 0.2, 0.3, 0.4], "max_len": [50, 100, 200]}}},
     "y15_fill": {"touch": True, "balance": 0.5, "mixed": True, "fill": True},
     "y15_fill_rand": {"touch": True, "balance": 0.5, "mixed": True, "eval_rand": True, "fill": True},
+    # RESEARCH.md Y16 (pre-registered 2026-11-06): production with stage 1 averaged over three members whose
+    # training copies and classifier use seeds 2027 / 2028 / 2029; evaluation copies stay on seed 2027.
+    # "ensemble" is not a feature or training key, so member 2027 is production's own stage-1 cache.
+    "y16_seeds": {"touch": True, "balance": 0.5, "mixed": True, "ensemble": [2027, 2028, 2029]},
+    "y16_seeds_rand": {"touch": True, "balance": 0.5, "mixed": True, "eval_rand": True, "ensemble": [2027, 2028, 2029]},
+    # RESEARCH.md Y18 (pre-registered 2026-11-07): Y16 + Y15's short ball-gap fill in every member.
+    "y18_fill": {"touch": True, "balance": 0.5, "mixed": True, "fill": True, "ensemble": [2027, 2028, 2029]},
+    "y18_fill_rand": {"touch": True, "balance": 0.5, "mixed": True, "eval_rand": True, "fill": True,
+                      "ensemble": [2027, 2028, 2029]},
 }
-PRODUCTION = "mixed"                                  # J6: mixed_rand 7/7 over b0_rand, mixed -0.0017 vs touch_bal (<= 0.01)
+# RESEARCH.md Y20 (pre-registered 2026-11-07): mixed with another stage-1 classifier (kora/engine.py), each
+# alone. A _rand twin is the same fits scored on the heavy-gap evaluation copies (kora.nested caches both).
+LGBM = {"kind": "lgbm", "n_estimators": 250, "learning_rate": 0.1, "num_leaves": 63, "min_child_samples": 200,
+        "reg_lambda": 1.0}
+Y20 = {"lgbm": LGBM, "long": {**LGBM, "n_estimators": 1000, "learning_rate": 0.05},
+       "deep": {**LGBM, "n_estimators": 500, "learning_rate": 0.05, "num_leaves": 255, "min_child_samples": 100},
+       "bag": {**LGBM, "n_estimators": 500, "learning_rate": 0.05, "colsample_bytree": 0.5, "subsample": 0.8,
+               "subsample_freq": 1}}
+for _k, _clf in Y20.items():
+    VARIANTS[f"y20_{_k}"] = {**VARIANTS["mixed"], "clf": _clf}
+    VARIANTS[f"y20_{_k}_rand"] = {**VARIANTS["mixed_rand"], "clf": _clf}
+# RESEARCH.md Y20 Stage B: the Stage A winner as a three-member ensemble exactly as Y16.
+VARIANTS["y21_long"] = {**VARIANTS["y20_long"], "ensemble": [2027, 2028, 2029]}
+VARIANTS["y21_long_rand"] = {**VARIANTS["y20_long_rand"], "ensemble": [2027, 2028, 2029]}
+# RESEARCH.md Y22 (pre-registered 2026-11-07): Y16 + the temporal network (kora/seq.py) blended into stage 1,
+# (1 - weight) x trees + weight x network. One set of network fits serves every weight and the _rand twins;
+# _s2028 is the second-seed check of the network.
+for _seed, _tag in ((2027, ""), (2028, "_s2028")):
+    for _k, _w in (("quarter", 0.25), ("half", 0.5), ("only", 1.0)):
+        VARIANTS[f"y22_{_k}{_tag}"] = {**VARIANTS["y16_seeds"], "seq": {"weight": _w, "seed": _seed, "settings": {}}}
+        VARIANTS[f"y22_{_k}{_tag}_rand"] = {**VARIANTS["y16_seeds_rand"],
+                                            "seq": {"weight": _w, "seed": _seed, "settings": {}}}
+# RESEARCH.md Y23 (pre-registered 2026-11-07): y22_quarter with the network averaged over seeds, or larger
+# (receptive field +-511 frames); _big_s2028 is the larger network's second-seed check.
+BIG = {"channels": 96, "blocks": 9, "length": 3072, "batch": 12}
+for _k, _sq in (("seeds2", {"seeds": [2027, 2028]}), ("seeds3", {"seeds": [2027, 2028, 2029]}),
+                ("big", {"settings": BIG}), ("big_s2028", {"seed": 2028, "settings": BIG}),
+                ("seeds2r", {"seeds": [2030, 2031]}), ("seeds3r", {"seeds": [2030, 2031, 2032]}),   # replicates
+                ("big2", {"seeds": [2027, 2028], "settings": BIG})):
+    _sq = {"weight": 0.25, "seed": 2027, "settings": {}, **_sq}
+    VARIANTS[f"y23_{_k}"] = {**VARIANTS["y16_seeds"], "seq": _sq}
+    VARIANTS[f"y23_{_k}_rand"] = {**VARIANTS["y16_seeds_rand"], "seq": _sq}
+PRODUCTION = "y16_seeds"                           # Y16: 5/7 over mixed, heavy gaps 6/7 (was mixed, J6)
 FEATURE_KEYS = ("touch", "mixed", "eval_rand")
 TRAIN_KEYS = ("balance",)
 
@@ -129,6 +170,8 @@ def stage1_version(config=CONFIG):
     for key in ("dwell", "peaks"):     # Y8a, Y12, added later: keyed only when on, so older caches keep their names
         if config.get(key):
             parts.append((ROOT / "kora" / f"{key}.py").read_bytes())
+    if config.get("clf"):              # Y20, same
+        parts += [(ROOT / "kora" / "engine.py").read_bytes(), json.dumps(config["clf"], sort_keys=True)]
     return feature_version(config) + "s" + _hash(parts)
 
 

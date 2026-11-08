@@ -15,6 +15,7 @@ run_awake() {
 }
 run_awake "$PY" -m kora.external             # 7 open Bundesliga matches -> data/cache
 run_awake "$PY" -m kora.train                # classifier + decoder by leave-one-match-out CV
+run_awake "$PY" -m kora.ensemble             # Y16: average stage 1 over the seed members, re-pick the decoder
 run_awake "$PY" -m kora.boundary             # change detector + duration decoder, kept only if CV says it helps
 "$PY" -m kora.run --out "${1:-Kora Analytics.csv}"
 "$PY" -m kora.checks "${1:-Kora Analytics.csv}"

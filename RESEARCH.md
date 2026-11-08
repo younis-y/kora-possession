@@ -189,7 +189,7 @@ J6 rule 2 reads `python -m kora.compare touch_bal mixed`. The committed submissi
 `touch_bal` on 2026-11-05 (commit 7007d78). The all-match CV kept the plain decoder there, because the
 detector improved fewer than 5 of 7 matches.
 
-### [pending] Y7: Do a stage-2 refiner, a wider grid, dwell features or stronger balancing recover short possessions? (Y7a, Y7c, Y8a, Y8b)
+### [dropped] Y7: Do a stage-2 refiner, a wider grid, dwell features or stronger balancing recover short possessions? (Y7a, Y7c, Y8a, Y8b)
 
 **Hypothesis:** on R2's held-out predictions, missed possessions under 2 s are still the largest
 error (oracle headroom +0.11). In 46% of them stage 1 has the right team on most frames but the decoder
@@ -239,9 +239,14 @@ possessions under 1 s fell from 0.621 (169 predicted) to 0.565 (216 predicted). 
 possessions of 1–2 s, precision fell from 0.670 to 0.615. The 1,000-draw paired-possession
 bootstrap (seed 0) gave a 5th–95th interval of −0.0104 to +0.0035 for spellF1 difference.
 The interval is descriptive and does not establish equivalence. Future work on short-possession
-recall should also preserve precision. The remaining Y7/Y8 outcomes are pending.
+recall should also preserve precision.
 
-### [pending] Y10: Do cuts at detector peaks recover swallowed short possessions?
+**Outcome (2026-11-05, recorded 2026-11-07 from `~/kora-runs/compare_*.log`):** all dropped against
+`touch_bal` (0.7528). `y7a_refine` 0.7415 (-0.0114), better on 0 of 7, recall under 1 s 0.268 -> 0.245,
+count ratio 0.870 -> 0.846 (the refiner smooths). `y7c_wide` 0.7547 (+0.0019, median 0), better on 3 of 7.
+`y8b_bal1` 0.7500 (-0.0028), better on 2 of 7, recall under 1 s 0.268 -> 0.305 but count ratio 0.902.
+
+### [dropped] Y10: Do cuts at detector peaks recover swallowed short possessions?
 
 **Hypothesis:** every decoder pays the same switching cost for a 0.5 s possession as for a 30 s one,
 so short possessions inside the other team's spell are swallowed. 48% of R2's misses are covered
@@ -271,9 +276,12 @@ both rise for a follow-up; the count ratio; and `kora.errors --compare` interval
 
 **Deployment** (`kora.run` with the all-7 detector) is added only if Y10 passes.
 
-**Outcome:** —
+**Outcome (2026-11-05, recorded 2026-11-07 from `~/kora-runs/compare_y10_cuts.log`):** dropped.
+`kora.compare mixed y10_cuts`: 0.7511 -> 0.7549 (+0.0038, median +0.0017), better on 4 of 7 (min
+-0.0028, max +0.0155); spellF1 up at every IoU 0.3-0.7; recall under 1 s 0.263 -> 0.305, count ratio
+0.879 -> 0.897. The closest to passing at the time, and the reason for the ceiling diagnosis below.
 
-### [pending] Y11, Y12: Do mirror averaging and weak-touch peaks help on top of production?
+### [dropped] Y11, Y12: Do mirror averaging and weak-touch peaks help on top of production?
 
 **Candidates (pre-registered 2026-11-05, before any outer score).** Each is `mixed` plus one change:
 
@@ -303,9 +311,12 @@ both rise for a follow-up; the count ratio; and `kora.errors --compare` interval
 
 Secondary: recall and precision under 2 s, the count ratio, and `kora.errors --compare` intervals.
 
-**Outcome:** —
+**Outcome (2026-11-06):** both dropped, so Y9 has nothing to combine and the V7 round 2 base stays `mixed`.
+`y11_mirror`: mean 0.7511 -> 0.7553 (+0.0042), better on 4 of 7, recall under 1 s 0.263 -> 0.294.
+`y12_peaks`: 0.7511 -> 0.7497 (-0.0014), better on 3 of 7. Seed check: `mixed_s2028` scored 0.7334;
+its evaluation copies are degraded with seed 2028 too, so this is not a paired comparison (see Y16).
 
-### [pending] Y13-Y15: Can a touch-event model find the possessions the frame model swallows?
+### [dropped] Y13-Y15: Can a touch-event model find the possessions the frame model swallows?
 
 **Diagnosis (2026-11-05, `python -m kora.ceiling mixed mixed_rand`, held-out predictions of production).**
 spellF1 if one error type were fixed perfectly:
@@ -357,7 +368,291 @@ filled by straight lines, with a flag column, before features. Both are decided 
 0.879 -> 0.891. Events beat no events on the inner mean in all 7 folds (+0.004 to +0.010) but passed
 the 5-of-6 inner rule in only 2, so 5 folds fell back to production. The event model is better than
 the detector but at usable false-peak rates still cuts out only 12-17% of swallowed spells; its
-features are the frame columns at the kink. Y15: pending.
+features are the frame columns at the kink.
+
+**Outcome (Y15, 2026-11-06):** dropped. `kora.compare mixed y15_fill`: 0.7511 -> 0.7576 (+0.0065), better
+on 4 of 7, recall under 1 s 0.263 -> 0.286. On heavy gaps, `kora.compare mixed_rand y15_fill_rand`:
+0.6607 -> 0.6633 (+0.0026), better on 4 of 7, recall under 1 s 0.167 -> 0.211. José's V8 diagnostics
+agree: only 31 of the 346 short possessions `mixed_stress` misses have any missing-ball frame.
+
+### [verified] Y16: Does averaging stage 1 over three seeds help?
+
+**Why (2026-11-06).** `mixed_s2028` (Y11 outcome) scored 0.7334 against 0.7511, but the seed there also
+drives the evaluation copies, so it mixes test-set and model variance. Here the seeds are split: the
+evaluation copies stay those of `mixed` (and `mixed_rand`), and only training changes.
+
+**Candidate (pre-registered 2026-11-06, before any member is fitted).** `y16_seeds` = `mixed` with
+stage 1 averaged, equal weights, over three members. Member s degrades its training copies with seed s
+(`train._copies`) and seeds its classifier with s, for s = 2027, 2028, 2029, fixed now; no other seeds
+or weights will be tried. Member 2027 is production itself (same cache). The classifier's own
+randomness is only its early-stopping split (Y11), so most of the members' diversity comes from the
+degraded copies, which makes this bagging over simulated gaps. The average replaces stage 1 in both the
+outer and the inner predictions; the detector, prior, decoder grids and selection rules are rerun on it
+unchanged (`kora/nested.py`, `member_stage1`). A pair's classifier predicts on both its matches, so
+each new member needs 28 fits, not 49, and every fit also predicts the heavy-gap evaluation copies.
+
+**Decision rule:** `kora.compare mixed y16_seeds` (mean up and at least 5 of 7 matches better). It
+ships only if `kora.compare mixed_rand y16_seeds_rand` does not lose more than 0.01 on the mean (V8).
+Secondary: recall and precision under 2 s, `kora.errors --compare`, and the seed-aware interval
+(#18) once merged. If kept, `kora.train`/`kora.run` fit the three members for the submission.
+
+**Outcome (2026-11-06, 6fe6389, clean checkout):** kept, the first candidate to pass since J6.
+`kora.compare mixed y16_seeds`: 0.7511 -> 0.7566 (+0.0055, median +0.0089), better on 5 of 7 (min
+-0.0090, max +0.0164); spellF1 rises at every IoU from 0.3 to 0.7; recall under 1 s 0.263 -> 0.320, 1-2 s
+0.536 -> 0.557; count ratio 0.879 -> 0.898. Heavy gaps, `kora.compare mixed_rand y16_seeds_rand`:
+0.6607 -> 0.6783 (+0.0176), better on 6 of 7; recall under 1 s 0.167 -> 0.195. Both well inside the V8
+condition. Next: fit the three members in `kora.train`/`kora.run` for the submission.
+
+### [dropped] Y18: Does the short ball-gap fill help on top of the seed ensemble?
+
+**Why (2026-11-07).** Y15's fill raised the mean (+0.0065, heavy gaps +0.0026) but was better on only
+4 of 7 matches. Single-seed stage 1 is noisy enough to flip a match by ~0.01 (Y16's members), so a
+small real gain can fail the 5-of-7 rule; averaging three members lowers that noise. The fill also
+targets the challenge match's 41% missing ball, which Y16 does not. Y11's mirror averaging, the other
+near-passer, is left out: it is the same kind of variance reduction the members already give.
+
+**Candidate (pre-registered 2026-11-07, before any filled member is fitted).** `y18_fill` = `y16_seeds`
+with `kora/fill.py` (unchanged since Y15) applied to every copy of every member: gaps under 25 frames
+inside a half, both ends seen, filled linearly, plus `b_filled`. Seeds 2027 / 2028 / 2029 and equal
+weights as in Y16; member 2027 is `y15_fill`'s own stage-1 cache. Nothing else changes and nothing
+else will be tried.
+
+**Decision rule:** `kora.compare y16_seeds y18_fill` (mean up and at least 5 of 7 matches better). It
+ships only if `kora.compare y16_seeds_rand y18_fill_rand` does not lose more than 0.01 on the mean (V8).
+Secondary: recall under 1 s and 1-2 s, count ratio. If kept, `kora.train`, `kora.ensemble` and
+`kora.run` apply the fill for the submission.
+
+**Outcome (2026-11-07, cdc2ae0, clean checkout):** dropped. `kora.compare y16_seeds y18_fill`: 0.7566 ->
+0.7582 (+0.0016, median -0.0005), better on 3 of 7 (min -0.0075, max +0.0139); recall under 1 s 0.320 ->
+0.326, 1-2 s 0.557 -> 0.548. Heavy gaps, `kora.compare y16_seeds_rand y18_fill_rand`: 0.6783 -> 0.6782,
+better on 3 of 7, though recall under 1 s rises 0.195 -> 0.221 and the count ratio 0.819 -> 0.850. With
+the members averaged, Y15's +0.0065 shrinks to +0.0016: most of it was the seed noise Y16 removes.
+
+### [dropped] Y19: Do SkillCorner's possession events give usable H/A/D labels?
+
+**Why (2026-11-07).** The seven IDSSE matches are both the training set and the only test set, and one
+seed swing (~0.018, Y11) is larger than most candidate deltas, so the keep rule has been deciding on
+noise (Y10, Y11, Y15, Y18). SkillCorner's open data (MIT, used since Y5 for missingness) also ships
+dynamic events for its 20 A-League matches: about 960 timed player possessions per match, with start
+and end types and game-interruption flags. If labels derived from them fit the possession the challenge
+scores, the 20 matches give 27 test matches, and real rather than simulated tracking gaps for training.
+Risks: the events are SkillCorner's own detection on broadcast tracking, possession runs touch to
+touch, dead time has to be inferred, and the source is 10 fps.
+
+**Labels (fixed 2026-11-07, before any statistic of them was computed).** `kora/skillcorner.py`
+`events_label`: each player possession [frame_start, frame_end] belongs to its team. The gap to the next
+possession stays with the team that had the ball last, unless a game interruption is flagged after the
+first or before the second; then it is dead, except its first `OUT_S` = 0.5 s (the ball still travelling,
+last team) and its last `RESTART_S` = 1.0 s (the restart in the air: the receiving team, or the other
+team when the start type is an `*_interception`). A live gap longer than `FLIGHT_S` = 4 s is unknown
+(X, not scored), as are the frames before a period's first and after its last possession. Frames are
+aligned by the `match_periods` start frames and checked against the tracking rows per period. The
+constants are football timing (pass flight, restart), not fitted.
+
+**Amended 2026-11-07 13:20, after the first gate run stopped at its alignment check, before any
+verdict.** 1899585's tracking ends at frame 60529, one frame before its `match_periods` end frame 60530,
+so the per-period row check raised. Rows are now placed by their own tracking frame number (`frames`,
+read once from the JSONL); for the other two gate matches the mapping is unchanged. That run had already
+printed the G1-G3 statistics of 1874553 and 1886347. No label rule or threshold changed.
+
+**Gate (pre-registered 2026-11-07, `python -m kora.scgate`, writes `models/gate_y19.json`).** It reads
+only `GATE` = 1874553, 1886347, 1899585 (the first three in `kora.skillcorner` order); the other 17 are
+not scored until it passes.
+- G1, labels against IDSSE (no model): dead share of labelled frames within 0.30-0.60; H/A spells per
+  45 minutes and median spell length each within 0.67-1.5 times the IDSSE mean; unknown at most 0.15 of
+  frames.
+- G2, alignment: on frames both call H or A, the event label agrees with SkillCorner's per-frame
+  `possession.group` on at least 0.90.
+- G3, the shipped model (`y16_seeds`, de873a7 models, its plain decoder, trained on IDSSE only): mean
+  spellF1 at least 0.45 on the three, and team accuracy at least 0.80 on frames both call H or A.
+- Pass = G1, G2 and G3. Reported, not gated (G4): member 2027 alone (`mixed`) against `touch_bal`
+  fitted on all seven, same decoder. Heavy simulated gaps ranked mixed far above (J6: +0.088).
+
+**If it passes**, each step pre-registered on its own: (1) the 17 others become extra test matches:
+each candidate fitted on all seven IDSSE matches, decoded with its IDSSE-chosen decoder, scored on the
+20, paired, beside the 7 nested deltas; (2) then SkillCorner as training data (real gaps), scored on the
+nested IDSSE folds and on SkillCorner held out by match. If it fails, the reason is recorded and
+SkillCorner stays missingness-only.
+
+**Outcome (2026-11-07, dc8cf28, clean checkout, `models/gate_y19.json`):** fails G1 and G2, so
+SkillCorner stays missingness-only and neither follow-up runs. The event labels are coarser than
+IDSSE's possession: 136 H/A spells per 45 minutes against 206 (ratio 0.66, bound 0.67) and a median
+spell of 5.7 s against 3.8 s (1.52, bound 1.5); the dead share (0.50 against 0.45) and the unknown
+share (0.06) are within bounds. They agree with SkillCorner's own per-frame possession group on 0.856
+of the frames where both name a team (bound 0.90). G3 passes: the shipped model scores 0.503 with team
+accuracy 0.916, but predicts 1,339 spells against 848 labelled (1.58 times; 0.90 on IDSSE). So most of
+the shortfall is the labels missing short possessions that IDSSE marks, which is the error we are trying
+to fix; as a test set they would reward swallowing them. G4 (reported only): `y16_seeds` 0.503, `mixed`
+0.452, `touch_bal` 0.458. Mixed is not ahead of touch_bal on these real gaps, and the ensemble's lead
+comes partly from predicting fewer spells (1,339 against 1,491), which these labels reward.
+
+### [verified] Y20: Does another stage-1 classifier, or more capacity, help?
+
+**Why (2026-11-07).** Stage 1 still uses the day-one HistGradientBoosting settings (250 trees, learning
+rate 0.1, 63 leaves, at least 200 rows per leaf), and every fit runs all 250 iterations, so its early
+stopping never fires: it may be capacity-limited. A timing check (no scores) on one six-match fold: HGB
+60 s, LightGBM with the same settings 28 s, train-set argmax agreement 0.988. A faster stage 1 also
+halves the cost of every later run.
+
+**Candidates (pre-registered 2026-11-07, before any candidate is fitted).** Each alone on top of
+`mixed`, through `kora/engine.py` (LightGBM 4.7.0, deterministic, column-wise); nothing else will be
+tried in this round.
+- `y20_lgbm`: LightGBM with the same settings (250 trees, 0.1, 63 leaves, min 200, L2 1.0).
+- `y20_long`: 1000 trees at 0.05.
+- `y20_deep`: 500 trees at 0.05, 255 leaves, min 100.
+- `y20_bag`: 500 trees at 0.05, half the features and 80% of the rows per tree (the seed now matters).
+
+Each `_rand` twin is the same fits scored on the heavy-gap evaluation copies; `kora.nested` caches both
+from one run (the training copies are the same), so the V8 check costs no fits.
+
+**Decision rule.**
+1. Screen, `kora.nested --variant <c> --screen` (the seven outer fits, reused by step 2): kora.train's
+   plain-decoder pick on the outer folds, against `mixed`'s cached folds scored the same way. A
+   candidate goes on if the mean delta is at least +0.002 (`y20_lgbm`: at least -0.003).
+2. Stage A, full nested: `kora.compare mixed <c>` keep rule (mean up, at least 5 of 7), and
+   `kora.compare mixed_rand <c>_rand` not lower by more than 0.01 (V8).
+3. Stage B, the second-seed check: the Stage A winner (largest mean delta if several) as a three-member
+   ensemble exactly as Y16, `y21` = winner + seeds 2027 / 2028 / 2029: `kora.compare y16_seeds y21` keep
+   rule, and `y16_seeds_rand y21_rand` not lower by more than 0.01. Promoted only if Stage A and Stage B
+   both pass; the build then fits the same classifier.
+4. `y20_lgbm` with no gain: if it passes the screen and Stage A is within -0.003 on the mean, LightGBM
+   becomes the engine for later experiments (twice as fast), not production by itself.
+
+**Amended 2026-11-07 14:42, for compute, before `y20_deep`'s screen result.** Under the current load a
+`y20_deep` fit takes about 14 minutes, so its Stage A (42 more fits) would take about 7 hours; its screen
+was stopped after 4 of 7 fits, before any score, and it gets no Stage A in this round. `y20_lgbm`'s
+Stage A is not run either: no later experiment in this round needs a faster tree engine (Y22 and Y23
+reuse the cached trees). Stage A runs for `y20_long` only (`y20_bag` failed its screen).
+
+**Outcome so far (2026-11-07, 63ea21d, clean checkout).** Screens against `mixed`'s outer folds (0.7516):
+`y20_lgbm` 0.7488 (-0.0028, 2/7: inside its -0.003 bar), `y20_bag` 0.7521 (+0.0004, 3/7: out),
+`y20_long` 0.7555 (+0.0038, 5/7); `y20_deep` stopped before any score (amendment). Stage A for
+`y20_long`: `kora.compare mixed y20_long` 0.7511 -> 0.7576 (+0.0065, median +0.0050), better on 5 of 7
+(min -0.0052, max +0.0213); recall under 1 s 0.263 -> 0.307; heavy gaps `mixed_rand` -> `y20_long_rand`
+0.6607 -> 0.6670 (+0.0063, 5/7). So it passes Stage A; Stage B (`y21_long`) is running.
+
+**Stage B (2026-11-07, 8ffce8f, clean checkout).** `kora.compare y16_seeds y21_long` 0.7566 -> 0.7595
+(+0.0029, median +0.0061), better on 5 of 7 (min -0.0173, max +0.0150); heavy gaps `y16_seeds_rand` ->
+`y21_long_rand` 0.6783 -> 0.6818 (+0.0035, 4/7), inside V8. Y20 passes; `y21_long` is a Y24 parent.
+
+### [dropped] Y22: Does a temporal network over the frame features help as a stage-1 member? (S3)
+
+**Why (2026-11-07).** Swallowed short possessions are worth +0.17 (ceiling diagnosis, Y13), and inside
+them the trees' evidence is no stronger than their noise; decoder and feature changes since have moved
+the score by less than 0.007. The trees see each frame through window averages, while a short
+possession is an ordered pattern (a touch by one team between touches by the other). S3 proposed a
+shallow temporal convolutional network over the existing features; Y19 closed the SkillCorner route,
+so it runs now. A timing check (no scores): 250 steps on one six-match fold take 6 s on the laptop's
+GPU (MPS), a prediction of one evaluation copy 0.3 s.
+
+**Model (fixed 2026-11-07, before any fit is scored), `kora/seq.py`.** Input: the 204 frame columns,
+standardised on the training copies, NaN set to 0, clipped to +-10. A 1x1 convolution to 64 channels,
+8 residual blocks (GroupNorm, dilated non-causal convolution with kernel 3 and dilation 2^i, GELU,
+dropout 0.1, 1x1 convolution), receptive field +-255 frames (about 10 s), then a 1x1 convolution to H/A/D
+logits. Trained on the variant's own training copies (those of `mixed`, seed 2027: degraded, randomly
+gapped and mirrored as for the trees) with the trees' balance weights (lambda 0.5): random 1024-frame
+windows inside one half, batch 16, 3000 steps, AdamW (one-cycle learning rate to 2e-3, weight decay
+0.01). Each half of an evaluation copy is predicted as one sequence. torch 2.15.0, a research
+dependency (not in `requirements.txt` unless promoted; its test is skipped without it).
+
+**Amended 2026-11-07 13:28, after one network fit and before any score.** The first queue was stopped
+because GroupNorm normalised over the whole window, so a 1024-frame training window and a whole half at
+prediction would see different statistics. Now each frame is normalised over its channels (LayerNorm),
+the loss counts only frames whose whole +-255-frame receptive field lies inside the window, and windows
+are 2048 frames. Nothing else changed.
+
+**Candidates (pre-registered 2026-11-07).** `y16_seeds` with stage 1 = (1 - w) x the three tree members'
+average + w x the network: w = 0.25 (`y22_quarter`, the network as a fourth equal member), 0.5
+(`y22_half`), 1.0 (`y22_only`). The detector, prior and decoder selection are rerun on the blend
+unchanged. One set of 28 network fits (7 singles and 21 pairs, each pair predicting both its matches, as
+Y16's members) serves all three weights and both evaluation sets. Nothing else is tried in this round.
+
+**Decision rule.**
+1. Screen, `kora.nested --variant y22_<w> --screen` (the 7 single fits): kora.train's plain-decoder pick
+   on the seven outer folds, the blend against the same run's tree-only outer folds (that is,
+   `y16_seeds`). A candidate goes on if the mean delta is at least +0.002.
+2. Stage A, full nested: `kora.compare y16_seeds y22_<w>` keep rule (mean up, at least 5 of 7), and
+   `kora.compare y16_seeds_rand y22_<w>_rand` not lower by more than 0.01 (V8).
+3. Stage B, the second seed: the Stage A winner (largest mean delta if several) refitted with network
+   seed 2028 (`y22_<w>_s2028`) must pass the same two checks against the same bases. Promoted only if
+   Stage A and Stage B both pass; the build then fits the network on all seven matches and `kora.run`
+   blends it.
+
+**Outcome so far (2026-11-07, f4844d5, clean checkout).** Screens against the tree-only folds (0.7575):
+`y22_quarter` 0.7642 (+0.0068, 7/7), `y22_half` 0.7632 (+0.0057, 5/7), `y22_only` 0.7375 (-0.0199, 0/7).
+The network alone is worse than the trees, but blended in it helps: its errors differ. Stage A:
+`kora.compare y16_seeds y22_quarter` 0.7566 -> 0.7673 (+0.0107, median +0.0122), better on 7 of 7 (min
++0.0016, max +0.0186); spellF1 up at every IoU 0.3-0.7 (0.833 -> 0.842 at 0.3, 0.668 -> 0.677 at 0.7);
+recall under 1 s 0.320 -> 0.349, 1-2 s 0.557 -> 0.579; count ratio 0.898 -> 0.908. Heavy gaps,
+`y16_seeds_rand` -> `y22_quarter_rand`: 0.6783 -> 0.6836 (+0.0053, 4/7), inside V8. `y22_half` 0.7653
+(+0.0087, 5/7); heavy gaps 0.6773 (-0.0011, 3/7), inside V8. So `y22_quarter` is the Stage A winner.
+
+**Stage B (2026-11-07 15:34): fails, so Y22 is not promoted.** With network seed 2028 the same blend,
+`y22_quarter_s2028`, scores 0.7577 against `y16_seeds` 0.7566 (+0.0011, median +0.0021), better on only 4
+of 7 (min -0.0076, max +0.0088); recall under 1 s 0.294. Against the seed-2027 run it is lower on all 7
+(-0.0096). Most of Stage A's +0.0107 was the luck of one network's seed: a single network on six matches
+is very seed-dependent. Y23's seed averages test whether a seed-robust gain remains (against
+`y16_seeds`, as its rule says when Stage B fails).
+
+### [verified] Y23: Does averaging the temporal network over seeds, or a larger one, add to Y22?
+
+**Why (2026-11-07).** Alone the network is weaker than the trees (Y22 screen 0.7375 against 0.7575) and,
+like any single fit, noisy; Y16 showed that averaging seeds helps the trees. A larger receptive field
+(+-20 s instead of +-10 s) may also let it see more of a possession.
+
+**Candidates (pre-registered 2026-11-07 14:45, after Y22's Stage A and before its Stage B result).**
+Each is `y22_quarter` (network weight 0.25) with one change; nothing else is tried in this round.
+- `y23_seeds2`: the network averaged over seeds 2027 and 2028 (both fitted by Y22, no new fits).
+- `y23_seeds3`: seeds 2027, 2028 and 2029.
+- `y23_big`: one larger network, 96 channels and 9 blocks (receptive field +-511 frames), 3072-frame
+  windows, batch 12, seed 2027; otherwise as Y22.
+
+**Decision rule.** Against `y22_quarter`: `kora.compare` keep rule (mean up, at least 5 of 7), and the
+`_rand` twin not lower than `y22_quarter_rand` by more than 0.01 (V8). `y23_big` also needs its second
+seed, `y23_big_s2028`, to pass the same checks. The winner is the passer with the largest mean delta. If
+Y22's Stage B fails, the same rules are applied against `y16_seeds` / `y16_seeds_rand` instead.
+
+**Amended 2026-11-07 16:13, after `y23_seeds2`'s result and before any other Y23 result: one more,
+stricter check.** Y22 showed one network seed can carry the whole gain, and both seed averages include
+seed 2027. So the winning seed average must also pass the same rule with a disjoint set of network
+seeds of the same size, starting at 2030 (`y23_seeds2r`: 2030, 2031; `y23_seeds3r`: 2030-2032). This can
+only block a promotion. `y23_seeds2` so far: 0.7566 -> 0.7646 (+0.0080, 6/7), heavy gaps 0.6783 ->
+0.6859 (+0.0076, 5/7).
+
+**Amended 2026-11-07 18:28, after `y23_big`'s normal-copy result (0.7669, +0.0103, 7/7) and before its
+heavy-gap and second-seed results: big cannot ship as a single network.** If `y23_big` and
+`y23_big_s2028` both pass, the candidate becomes their average, `y23_big2` (seeds 2027 and 2028, no new
+fits), which must pass the same rule; the winner is then the largest mean delta among the passing
+`y23_seeds2`, `y23_seeds3` and `y23_big2`. `y23_big2` needs no disjoint replicate (`y23_big_s2028` is
+its independent seed). Also recorded: `y23_seeds3` 0.7641 (+0.0075, 7/7, min +0.0026), heavy gaps 0.6808
+(+0.0025, 5/7): passes.
+
+**Outcome (2026-11-07, clean checkouts at 4f839b4 and c757ffb).** Y22's Stage B failed, so all are judged
+against `y16_seeds` (0.7566; heavy gaps 0.6783). `y23_seeds2` +0.0080, 6/7 (heavy gaps +0.0076, 5/7);
+`y23_seeds3` +0.0075, 7/7 (+0.0025, 5/7); `y23_big` 0.7669 +0.0103, 7/7 (+0.0021, 5/7); `y23_big_s2028`
+0.7635 +0.0069, 6/7 (heavy gaps -0.0007, 3/7, inside V8). Both big seeds pass, so `y23_big2` was run:
+0.7566 -> 0.7665 (+0.0099, median +0.0087), better on all 7 (min +0.0019, max +0.0201); heavy gaps
+0.6783 -> 0.6822 (+0.0039, 4/7), inside V8. **Winner: `y23_big2`** (largest mean delta among the passers;
+no disjoint replicate, as amended 18:28). Unlike Y22's small network, the larger one holds across seeds.
+
+### [pending] Y24: Do the Y20 trees and the Y23 network add up?
+
+**Why (2026-11-07).** Y20 (`y20_long`, more capacity in the trees) and Y23 (a temporal network blended
+into stage 1) change different parts of stage 1, so if both pass, their gains may add.
+
+**Candidate (pre-registered 2026-11-07 19:35, before Y21's result and before Y23's winner is known).**
+Only if `y21_long` passes Y20's Stage B and Y23 has a winner: `y24` = `y21_long`'s three tree members
+with Y23's winning network(s) blended exactly as in Y23 (weight 0.25). No new fits: both parents'
+caches are reused (the network's cache key leaves out the tree classifier, which does not change its
+training copies).
+
+**Decision rule.** Against the better parent (the larger mean delta against `y16_seeds`): keep rule
+(mean up, at least 5 of 7) and the `_rand` twin not lower by more than 0.01 (V8). If it passes, `y24` is
+production; if not, the better parent is. If only one parent passes, that parent is production.
+
+**Status (2026-11-07 23:59).** Both parents pass (`y23_big2` +0.0099, `y21_long` +0.0029; the better parent
+is `y23_big2`). Not run: the team stopped new model runs at 23:59. Until it runs, the rule's fallback holds:
+`y23_big2` is the production candidate. It is not built yet; the submitted file is still `y16_seeds`.
 
 ## Vladymyr — error metrics and decoder
 
@@ -741,12 +1036,22 @@ round 1's result, so it is not independent of it (Y2).
 - Known limits: the same seven matches as round 1. Round 1's positive bootstrap interval does not
   make this round confirmatory.
 - Run: Friday 6 November, after Y9, by Younis.
-- Base pinned (2026-11-06, before the run): Y9 kept no candidate, because Y7a, Y7c, Y8a and Y8b were all
-  dropped, so the post-Y9 production is `mixed`. `kora/variant.py` defines
-  `VARIANTS["v7r2"] = with_detector("mixed", ha_priority=True)`, resolving to `{"touch": True,
-  "balance": 0.5, "mixed": True, "detector": {"ha_priority": True}}`, with the same feature and
-  stage-1 versions as `mixed`. The run commit and clean-tree state are recorded with the result.
-### [pending] V8: How does production hold up when the ball is missing far more often?
+- Base pin, final (2026-11-06, before any outer run of `v7r2`): Younis reports that Y11 (0.7553, 4/7)
+  and Y12 (0.7497, 3/7) were dropped. Their JSON has not been checked here. With Y7a, Y7c, Y8a, Y8b,
+  Y10 and Y14 already out, Y9 has nothing to combine, its seed-2028 confirmation does not apply, and
+  the base is `mixed`. Pin: `VARIANTS["v7r2"] = with_detector("mixed", ha_priority=True)` (PR #17),
+  resolving to `{"touch": True, "balance": 0.5, "mixed": True, "detector": {"ha_priority": True}}`,
+  with the same feature and stage-1 versions as `mixed`. Both `mixed` and `v7r2` run with seed 2027
+  on commit `2f8b46f` (PR #17's head), because the J6 `mixed` run used an earlier commit. Before
+  either starts, record Younis's confirmation here that the whole working tree, including `models/`,
+  is clean. The run's `dirty` flag checks only `kora/`. Confirmation: pending.
+
+**Round 2 status (2026-11-08): deferred, not run.** No round-2 run was recorded before the team's run
+stop on 7 November (23:59), and no clean-tree confirmation was recorded. Production has since moved from
+`mixed` to `y16_seeds`, whose build drops the detector, and `y23_big2` is the next candidate, so a pass
+on `mixed` would not apply to either. The `mixed` pin is retired (removed from PR #17). Round 1's
+dropped result stands; any retry needs a new registration against the production of that time.
+### [verified] V8: How does production hold up when the ball is missing far more often?
 
 **Why:** Nested evaluation copies are degraded with the camera-on estimate at a random severity,
 with 3.9% missing-ball frames recorded for B0 in V4. The tech doc lists limited exposure to ball
@@ -788,7 +1093,52 @@ and production is changing to `mixed`. This round runs only `mixed_stress`
   does not estimate the challenge score. J6 informed this amendment, so it is not independent
   confirmation.
 
-**Outcome:** —
+**Outcome (2026-11-06, `mixed_stress`, commit e7019e9, seed 2027):** report only.
+At run start the tracked code was clean, but the whole tree was not: earlier result JSON files
+`nested_touch_bal_stress.json` and `nested_y8a_dwell.json` were untracked in `models/`.
+The metadata `dirty: false` checks only `kora/` and does not establish a clean whole tree.
+Mean spellF1 was 0.6301 ± 0.0402 across seven matches. Per match, in J03WPY, J03WN1,
+J03WMX, J03WOH, J03WQQ, J03WOY, J03WR9 order: 0.6450 / 0.6430 / 0.5508 / 0.6876 /
+0.6061 / 0.6213 / 0.6567. Mean spellF1 at IoU 0.3–0.7 was 0.7449 / 0.6986 / 0.6372 /
+0.5730 / 0.4967. The model reported 2,626 possessions versus 3,061 true (0.858 ratio).
+
+The realized ball-missing share was 328,976 / 1,002,644 frames (32.81%). At IoU 0.5,
+recall was 38/384 (0.099) for true possessions under 1 s and 207/535 (0.387) for 1–2 s.
+The association diagnostic reported 228 merge components and 99 split components; 226 of
+those merges involved a missed opposite-team possession. At a 25-frame tolerance, exact H↔A
+handover recall was 1,125/2,351 (0.479). False D on true live frames was 745/518,257 (0.0014)
+when the ball was seen and 1,740/34,848 (0.0499) when missing. Of 346 missed true
+possessions under 1 s, 31 had any missing-ball frames and 28 had a missing-ball majority.
+Those misses contained 404 missing frames out of 4,621 total (8.7%). These counts describe
+the simulated evaluation copies, not the challenge match, and do not establish a cause.
+
+Normal-condition `mixed` scored 0.7511 as descriptive context. This is not a controlled
+estimate of the isolated cost of missing balls: the evaluation profile changes player gaps and
+close-ups as well, and the detector is refitted and decoder settings reselected on stressed
+copies. The gaps remain label-conditioned and are not an estimate of the challenge score.
+The summary is `models/nested_mixed_stress.json`; regenerating V1–V4 diagnostics requires its
+separate prediction bundle. No production decision follows from V8.
+
+**Check and remaining diagnostics (2026-11-06, Vladymyr).** The release `nested-v8` bundle
+`nested_mixed_stress_predictions.npz` has SHA-256 `8ebd5a9348adfd6ac159b265f7f30ba93399ae963fd6ce07bb71a3e210d9151e`
+(GitHub records no digest for it). `kora.errors --predictions` on it (PR #18 code, `2da0ac9`)
+reproduces every diagnostic count above. The JSON matches the mean, per-match and per-IoU scores and
+the possession counts. The two untracked JSONs are outputs; `kora.nested` at `e7019e9` reads no
+result JSON, so they could not affect the run. The registered diagnostics not listed above:
+
+- Missed true possessions at IoU 0.5: 1,256. Absorbed by the other team 573 (45.6%), same team with
+  boundaries off 590 (47.0%), team swap 74, dead ball instead 19. Under 1 s: 206 of 346 absorbed by the
+  other team, 124 boundaries off, 13 dead ball, 3 team swap.
+- Invented predicted possessions: 821. Inside the other team's possession 317, same team with
+  boundaries off 356, team swap 74, on dead ball 64, mixed 10.
+- Missed live→D transitions at 25 frames: 295. A predicted stoppage lay within 25 frames but the
+  preceding team was wrong for 238 (80.7%); no predicted stoppage for 57.
+- Ball visibility in true possessions of 1–2 s: missed 328 with 1,044 of 11,897 frames missing
+  (8.8%), found 207 with 259 of 7,964 (3.3%). Under 1 s, found possessions had no missing frames.
+
+In these stressed copies, 206 of 346 missed true possessions under 1 s were classified as absorbed by
+the other team; 31 had any missing-ball frames. These descriptive counts do not establish why the
+possessions were missed. Report only.
 
 ## José — missing-ball robustness and extra data
 
