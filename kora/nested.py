@@ -35,7 +35,7 @@ import numpy as np
 from joblib import Parallel, delayed
 
 from .boundary import GRID, RAW, context, model as detector, runs_of, target
-from . import dwell, engine, events, fill, peaks, seq
+from . import dwell, engine, events, fill, peaks, seq, visdecode
 from .cuts import relabel
 from . import train as _train
 from .data import cache_dir
@@ -54,6 +54,8 @@ PLAIN = [tuple(s) for s in DECODER["plain_grid"] or
          [(a, h, d) for a in GRID_ALPHA for h in GRID_HA for d in GRID_D]]
 HSMM = [tuple(s) for s in DECODER["hsmm_grid"] or GRID]
 INNER_WINS = DECODER["inner_wins"]   # HSMM kept if it beats plain on the inner mean and on >= this many of 6
+if DECODER["vis_factor"]:            # Y26: plain settings gain a 4th entry, cost_d's factor where the ball is missing
+    PLAIN = [s + (f,) for s in PLAIN for f in DECODER["vis_factor"]]
 
 
 def scores(y, pred, half):
@@ -226,8 +228,16 @@ def fit_refiner(ctx, labels, train, test):
     return detector().fit(X, y).predict_proba(ctx[test])
 
 
-def plain_scores(P, y, half, prior, setting):
-    return [scores(y[k], decode(P[k], segments_of(half[k]), prior, *setting), half[k])["mean_f1"] for k in P]
+def plain_path(P, half, prior, setting, missing=None):
+    """Plain decoder path; a 4-entry setting (Y26) is kora/visdecode.py's, with `missing` the ball-gap frames."""
+    if len(setting) == 4:
+        return visdecode.decode(P, segments_of(half), prior, *setting, missing)
+    return decode(P, segments_of(half), prior, *setting)
+
+
+def plain_scores(P, y, half, prior, setting, missing=None):
+    return [scores(y[k], plain_path(P[k], half[k], prior, setting, missing and missing[k]), half[k])["mean_f1"]
+            for k in P]
 
 
 def hsmm_paths(P, C, y, half, prior, rate, setting):
@@ -321,11 +331,22 @@ def main():
             if k != m and not args.screen:
                 inner[m, k] = stage1(data, {m, k}, k, mirrored, twin)
                 print(f"stage 1 without {m}, {k} ({time.time() - t0:.0f} s)", flush=True)
+    cross = None
+    if CONFIG.get("cross"):            # Y26: detector, prior and decoder chosen on the other gap condition's inner folds
+        if args.screen or CONFIG.get("tta") or DECODER["refine"] or DECODER["cuts"] or DECODER["events"] or DECODER["vis_factor"] \
+                or "weight_missing" in CONFIG.get("seq", {}):
+            raise SystemExit("cross is registered on the plain and HSMM decoders only")
+        fv_o, X_o = eval_copies(not CONFIG.get("eval_rand"))
+        key_o = stage1_version(eval_config(not CONFIG.get("eval_rand")))
+        cross = {"fv": fv_o, "raw": {m: X_o[m][RAW] for m in MATCHES},
+                 "inner": {mk: np.load(cache_dir() / f"oof_{key_o}_{mk[1]}_x{mk[0]}.npy") for mk in inner}}
     if CONFIG.get("seq"):              # Y22: fitted while the training copies are loaded, blended in below
         evs, sc = dict(eval_copies(r) for r in (False, True)), CONFIG["seq"]
-        parts = [seq_stage1(data, evs, {**sc, "seed": s}, pairs=not args.screen)[FEATURE_VERSION]
+        parts = [seq_stage1(data, evs, {**sc, "seed": s}, pairs=not args.screen)
                  for s in sc.get("seeds") or [sc["seed"]]]                   # Y23: averaged over seeds
-        seqP = {key: np.mean([p[key] for p in parts], axis=0) for key in parts[0]}
+        seqP = {key: np.mean([p[FEATURE_VERSION][key] for p in parts], axis=0) for key in parts[0][FEATURE_VERSION]}
+        if cross:
+            cross["seq"] = {key: np.mean([p[cross["fv"]][key] for p in parts], axis=0) for key in seqP}
         print(f"temporal network done ({time.time() - t0:.0f} s)", flush=True)
     del data, mirrored
     if CONFIG.get("ensemble"):         # Y16: equal-weight average with the other members' stage 1
@@ -334,21 +355,38 @@ def main():
         if base != _train.SEED or FEATURE_VERSION not in evs:
             raise SystemExit("the first ensemble seed must be production's and the evaluation copies its own")
         for s in others:
-            p = member_stage1(s, evs, pairs=not args.screen)[FEATURE_VERSION]
+            pp = member_stage1(s, evs, pairs=not args.screen)
+            p = pp[FEATURE_VERSION]
             outer = {m: outer[m] + p[frozenset([m]), m] for m in MATCHES}
             inner = {(m, k): v + p[frozenset([m, k]), k] for (m, k), v in inner.items()}
+            if cross:
+                cross["inner"] = {(m, k): v + pp[cross["fv"]][frozenset([m, k]), k] for (m, k), v in cross["inner"].items()}
             print(f"member {s} added ({time.time() - t0:.0f} s)", flush=True)
         outer = {m: v / len(CONFIG["ensemble"]) for m, v in outer.items()}
         inner = {mk: v / len(CONFIG["ensemble"]) for mk, v in inner.items()}
+        if cross:
+            cross["inner"] = {mk: v / len(CONFIG["ensemble"]) for mk, v in cross["inner"].items()}
     if CONFIG.get("seq"):              # Y22: (1 - w) x trees + w x temporal network
         w, trees = CONFIG["seq"]["weight"], outer
-        outer = {m: (1 - w) * v + w * seqP[frozenset([m]), m] for m, v in outer.items()}
-        inner = {(m, k): (1 - w) * v + w * seqP[frozenset([m, k]), k] for (m, k), v in inner.items()}
+        if "weight_missing" in CONFIG["seq"]:   # Y26: the network's weight on frames without the ball
+            wm = CONFIG["seq"]["weight_missing"]
+            wk = {k: np.where(seen[k] == 1, w, wm)[:, None] for k in MATCHES}
+        else:
+            wk = {k: w for k in MATCHES}
+        outer = {m: (1 - wk[m]) * v + wk[m] * seqP[frozenset([m]), m] for m, v in outer.items()}
+        inner = {(m, k): (1 - wk[k]) * v + wk[k] * seqP[frozenset([m, k]), k] for (m, k), v in inner.items()}
+        if cross:
+            cross["inner"] = {(m, k): (1 - w) * v + w * cross["seq"][frozenset([m, k]), k]
+                              for (m, k), v in cross["inner"].items()}
         if args.screen:
             return screen(outer, y, half, labels, P0=trees)
 
     # 2. per outer match: detector folds on the inner matches, then the detector for m
-    ctx = {(m, k): context(inner[m, k], raw[k]) for m, k in inner}
+    if cross:                          # Y26: from here on the inner folds are the other condition's; outer[m] is unchanged
+        inner, raw_in = cross["inner"], cross["raw"]
+    else:
+        raw_in = raw
+    ctx = {(m, k): context(inner[m, k], raw_in[k]) for m, k in inner}
     ctx.update({(m, m): context(outer[m], raw[m]) for m in MATCHES})
     jobs = [(m, k) for m in MATCHES for k in MATCHES]                 # k == m is the outer detector
     preds = Parallel(n_jobs=len(MATCHES))(
@@ -374,7 +412,8 @@ def main():
         prior = np.bincount(np.concatenate([labels[k] for k in ins]), minlength=3) / sum(len(labels[k]) for k in ins)
         rate = float(np.mean([(tgt[k] == 1).mean() for k in ins]))
 
-        plain = np.array(Parallel(n_jobs=-1)(delayed(plain_scores)(P, yi, hi, prior, s) for s in PLAIN))
+        miss = {k: seen[k] == 0 for k in ins} if DECODER["vis_factor"] else None
+        plain = np.array(Parallel(n_jobs=-1)(delayed(plain_scores)(P, yi, hi, prior, s, miss) for s in PLAIN))
         bp = int(plain.mean(1).argmax())
         hs = np.array(Parallel(n_jobs=-1)(delayed(hsmm_scores)(P, C, yi, hi, prior, rate, g) for g in HSMM))
         bh = int(hs.mean(1).argmax())
@@ -382,13 +421,13 @@ def main():
 
         ld = log_duration([r for k in ins for r in runs_of(y[k], half[k])])
         seg = segments_of(half[m])
-        pred_plain = decode(outer[m], seg, prior, *PLAIN[bp])
+        pred_plain = plain_path(outer[m], half[m], prior, PLAIN[bp], seen[m] == 0)
         pred_hsmm = decode_hsmm(outer[m], change[m, m], seg, prior, ld, *HSMM[bh][:4], rate, *HSMM[bh][4:])
         pred = pred_hsmm if keep else pred_plain
         s_nocut, cut = scores(y[m], pred, half[m]), {"theta": None, "gap": None}
         if DECODER["cuts"] or DECODER["events"]:
             paths = (hsmm_paths(P, C, yi, hi, prior, rate, HSMM[bh]) if keep else
-                     {k: decode(P[k], segments_of(half[k]), prior, *PLAIN[bp]) for k in ins})
+                     {k: plain_path(P[k], half[k], prior, PLAIN[bp], miss and miss[k]) for k in ins})
             off = np.array([scores(y[k], paths[k], half[k])["mean_f1"] for k in ins])
         if DECODER["cuts"]:                                            # Y10: cut at detector peaks (kora/cuts.py)
             grid = [(t, g) for t in DECODER["cuts"]["theta"] for g in DECODER["cuts"]["gap"]]
@@ -411,7 +450,7 @@ def main():
         s, s_plain, s_hsmm = scores(y[m], pred, half[m]), scores(y[m], pred_plain, half[m]), scores(y[m], pred_hsmm, half[m])
         folds[m] = {
             "inner_matches": ins, "decoder": "hsmm" if keep else "plain",
-            "plain": dict(zip(("alpha", "cost_ha", "cost_d"), PLAIN[bp]), inner_mean=float(plain[bp].mean())),
+            "plain": dict(zip(("alpha", "cost_ha", "cost_d", "factor"), PLAIN[bp]), inner_mean=float(plain[bp].mean())),
             "hsmm": dict(zip(("cost_ha", "cost_d", "w_dur", "beta", "ha_bonus_only"),
                              (HSMM[bh] + (False,))[:5]), inner_mean=float(hs[bh].mean()), rate=rate),
             "prior": prior.tolist(),

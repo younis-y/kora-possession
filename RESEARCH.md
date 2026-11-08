@@ -685,6 +685,50 @@ CPU inference in a subprocess (as `tests/test_y19_y20.py` does) or with `torch.s
 `y25_half` 0.7630 (-0.0034, 2 of 7), heavy gaps 0.6822 -> 0.6848 (+0.0025, 4/7): fails. `y25_big3` 0.7671
 (+0.0006, median -0.0011, 3/7), heavy gaps 0.6798 (-0.0024, 2/7): fails. No winner; production stays `y23_big2`. Bundles for `y16_seeds` and `y23_big2` (+ `_rand`) are in release `nested-y23`.
 
+### [pending] Y26: Is the decoder we ship tuned for the wrong amount of missing ball?
+
+**Why (2026-11-08).** The challenge match has the ball missing on 41% of graded frames (CHALLENGE.md);
+the normal evaluation copies have 3.9% (V4) and the heavy-gap copies (`_rand`, the external every-frame
+profile) about 40%. Production's detector, prior and decoder settings are chosen on normal copies
+(`kora.ensemble.pick_decoder`, `kora.boundary`), and that is what `kora.run` applies to the challenge. The
+heavy-gap figures so far (0.6822 for `y23_big2_rand`) re-choose all three on heavy-gap copies, so they
+score a pipeline we do not ship. The choices differ in every fold (`models/nested_y23_big2*.json`): plain
+cost_d 2-16 on normal copies against 16-128 on heavy-gap copies, HSMM cost_d 8 against 8-16. Missing
+ball reads as a stoppage to stage 1, and a decoder tuned without gaps lets those phantom stoppages split
+possessions. The Y13 ceiling also shows stage-1 signal, not decoding, limits the normal copies; under
+heavy gaps the decoder has more to gain.
+
+**Measurement (report only).** `y23_big2_xn`: `y23_big2_rand`'s heavy-gap evaluation copies, with the
+detector, prior and decoder settings chosen on the normal inner folds ("cross" in `kora.nested`), i.e.
+what ships, scored under heavy gaps. Pairing check: its per-fold choices and inner means equal
+`y23_big2`'s.
+
+**Candidates (pre-registered 2026-11-08, before any run).** All reuse `y23_big2`'s cached stage 1 (no fits
+other than the detectors), each scored on both conditions:
+- `y26_heavysel`: detector, prior and decoder chosen on the heavy-gap inner folds and scored on normal
+  copies. Its heavy-gap side is `y23_big2_rand` itself. Pairing check: its per-fold choices and inner
+  means equal `y23_big2_rand`'s.
+- `y26_viscost`: plain grid times a factor in {1, 2, 4, 8} on cost_d for switches on frames without the
+  ball (`kora/visdecode.py`; factor 1 is the plain decoder exactly; `decode.py` unchanged).
+- `y26_cuts`: Y10's cuts (`kora/cuts.py`, same theta/gap grid and inner rule) on `y23_big2`. Pairing
+  check: `spell_f1_nocut` equals `y23_big2` on every fold.
+- `y26_visw`: network weight 0.5 on frames without the ball, 0.25 elsewhere (fixed, no grid).
+
+**Decision rule (heavy-gap primary, proposed to Vladymyr and José; J6's robustness form).**
+- `y26_heavysel` is kept if `kora.compare y23_big2_xn y23_big2_rand` has the mean up and at least 5 of 7
+  matches better, and `kora.compare y23_big2 y26_heavysel` loses no more than 0.01.
+- Each other candidate is kept if `kora.compare y23_big2_rand <v>_rand` has the mean up and at least 5 of 7
+  better, and `kora.compare y23_big2 <v>` loses no more than 0.01.
+- Second-seed check for each kept candidate: the same change on `y23_big_s2028` (the larger network,
+  seed 2028 only, cached) must also raise the heavy-gap mean: `kora.compare y26_heavysel_r_xn
+  y23_big_s2028_rand` for heavysel, `kora.compare y23_big_s2028_rand y26_<v>_r_rand` for the others.
+- If the team keeps the normal copies primary instead, the standard keep rule plus V8 decides, and
+  both readings are recorded.
+
+Kept candidates are combined (Y28) and deployed only after Vladymyr signs off the decoder change
+(`kora/ensemble.py` writes the heavy-gap leave-one-out predictions so that `kora.train` and
+`kora.boundary` choose on them; nothing in `decode.py` or `boundary.py` changes).
+
 ## Vladymyr — error metrics and decoder
 
 ### [verified] V1: Are possessions merged, split, or miscounted?

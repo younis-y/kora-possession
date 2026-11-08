@@ -113,6 +113,22 @@ for _k, _sq in (("big3", {"seeds": [2027, 2028, 2029]}), ("half", {"weight": 0.5
     _sq = {**VARIANTS["y23_big2"]["seq"], **_sq}
     VARIANTS[f"y25_{_k}"] = {**VARIANTS["y16_seeds"], "seq": _sq}
     VARIANTS[f"y25_{_k}_rand"] = {**VARIANTS["y16_seeds_rand"], "seq": _sq}
+# RESEARCH.md Y26 (pre-registered 2026-11-08): decode-only candidates on y23_big2's cached stage 1. "cross" chooses the
+# detector, prior and decoder settings on the other gap condition's inner folds (kora.nested), so y23_big2_xn is what
+# ships scored on heavy gaps, and y26_heavysel is the heavy-gap choice scored on normal copies (its heavy-gap side is
+# y23_big2_rand itself). vis_factor: kora/visdecode.py's dearer dead-ball switch where the ball is missing.
+# weight_missing: the network's weight on frames without the ball.
+VARIANTS["y23_big2_xn"] = {**VARIANTS["y23_big2_rand"], "cross": True}
+VARIANTS["y26_heavysel"] = {**VARIANTS["y23_big2"], "cross": True}
+for _k, _extra in (("viscost", {"decoder": {"vis_factor": [1, 2, 4, 8]}}),
+                   ("cuts", {"decoder": {"cuts": VARIANTS["y10_cuts"]["decoder"]["cuts"]}}),
+                   ("visw", {"seq": {**VARIANTS["y23_big2"]["seq"], "weight_missing": 0.5}})):
+    VARIANTS[f"y26_{_k}"] = {**VARIANTS["y23_big2"], **_extra}
+    VARIANTS[f"y26_{_k}_rand"] = {**VARIANTS["y23_big2_rand"], **_extra}
+    if _k == "visw":                   # second-seed check (_r): the same change on y23_big_s2028
+        _extra = {"seq": {**VARIANTS["y23_big_s2028"]["seq"], "weight_missing": 0.5}}
+    VARIANTS[f"y26_{_k}_r_rand"] = {**VARIANTS["y23_big_s2028_rand"], **_extra}
+VARIANTS["y26_heavysel_r_xn"] = {**VARIANTS["y23_big_s2028_rand"], "cross": True}   # heavysel's check: _xn -> _rand
 PRODUCTION = "y23_big2"     # Y23: y16_seeds + larger temporal network (2 seeds), 7/7 over y16_seeds (was y16_seeds)
 FEATURE_KEYS = ("touch", "mixed", "eval_rand")
 TRAIN_KEYS = ("balance",)
@@ -122,7 +138,8 @@ TRAIN_KEYS = ("balance",)
 # beta); None means the default grids (kora.train GRID_*, kora.boundary GRID). refine: decode stage-2
 # probabilities (kora.nested.fit_refiner, Y7a) instead of stage 1's. cuts: {"theta": [...], "gap": [...]}
 # grid for boundary-cut relabelling (kora/cuts.py, Y10), chosen in the inner folds; None = off.
-DECODER = {"inner_wins": 5, "plain_grid": None, "hsmm_grid": None, "refine": False, "cuts": None, "events": None}
+DECODER = {"inner_wins": 5, "plain_grid": None, "hsmm_grid": None, "refine": False, "cuts": None, "events": None,
+           "vis_factor": None}
 DETECTOR = {"ha_priority": False}
 
 
