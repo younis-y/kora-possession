@@ -725,9 +725,11 @@ other than the detectors), each scored on both conditions:
 - If the team keeps the normal copies primary instead, the standard keep rule plus V8 decides, and
   both readings are recorded.
 
-Kept candidates are combined (Y28) and deployed only after Vladymyr signs off the decoder change
-(`kora/ensemble.py` writes the heavy-gap leave-one-out predictions so that `kora.train` and
-`kora.boundary` choose on them; nothing in `decode.py` or `boundary.py` changes).
+Kept candidates are combined (Y28) and deployed only after Vladymyr signs off the decoder change.
+Deploying `y26_heavysel` is a configuration change (amended before any run, 2026-11-08): the build
+variant sets `eval_rand`, so `kora.train`, `kora.ensemble` and `kora.boundary` make their leave-one-out
+choices on the heavy-gap evaluation copies (`train._copies`). Training copies, and so every fitted
+model, are unchanged; nothing in `decode.py` or `boundary.py` changes.
 
 ## Vladymyr — error metrics and decoder
 
