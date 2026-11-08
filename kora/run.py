@@ -22,10 +22,17 @@ warnings.filterwarnings("ignore", category=RuntimeWarning)
 MODELS = Path(__file__).resolve().parent.parent / "models"
 
 
-def stage1(bundle, X):
-    """Stage-1 probabilities, averaged over the seed members when there are several (Y16, kora/ensemble.py)."""
+def stage1(bundle, X, cfg=None, half=None):
+    """Average the trees, then optionally blend the saved CPU networks, each half separately."""
     x = X[bundle["columns"]].to_numpy()
-    return np.mean([m.predict_proba(x) for m in bundle.get("models") or [bundle["model"]]], axis=0)
+    proba = np.mean([m.predict_proba(x) for m in bundle.get("models") or [bundle["model"]]], axis=0)
+    if cfg is not None and "seq" in cfg:
+        from . import seqdeploy
+        sc = cfg["seq"]
+        net = np.mean([seqdeploy.predict_cpu(seqdeploy.load(MODELS / name), X, half)
+                       for name in sc["files"]], axis=0)
+        proba = (1 - sc["weight"]) * proba + sc["weight"] * net
+    return proba
 
 
 def predict():
@@ -33,7 +40,7 @@ def predict():
     X = build(players, team, ball, section)
     bundle = joblib.load(MODELS / "classifier.joblib")
     cfg = json.loads((MODELS / "decoder.json").read_text())
-    proba = stage1(bundle, X)
+    proba = stage1(bundle, X, cfg, section)       # section identifies the halves, including ungraded frames
     prior = np.array(cfg["prior"])
     if "hsmm" in cfg:                         # kept only if it won leave-one-match-out CV
         h = cfg["hsmm"]

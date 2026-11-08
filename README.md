@@ -7,9 +7,15 @@ automatic tracking, homography and smart tagging supplied by the organisers.
 ## Setup
 
 ```bash
-python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+python3 -m venv .venv
+# Linux only: install the CPU torch wheel first, so requirements.txt doesn't pull the CUDA build
+.venv/bin/pip install torch==2.15.0 --index-url https://download.pytorch.org/whl/cpu
+.venv/bin/pip install -r requirements.txt
 # unpack the match bundle into ./data/{tactical,broadcast}/ or export MTAH_DATA_DIR=/path/to/bundle
 ```
+
+torch is only used by the temporal network (`kora/seq.py`). Its inference always runs on CPU with one
+thread (`kora/seqdeploy.py`); training uses MPS when available.
 
 ## Run
 

@@ -4,7 +4,13 @@
 set -e
 cd "$(dirname "$0")"
 PY=.venv/bin/python
-[ -x "$PY" ] || { python3 -m venv .venv && .venv/bin/pip install -q -r requirements.txt; }
+if [ ! -x "$PY" ]; then
+    python3 -m venv .venv
+    # Linux: the CPU torch wheel first, so the pin below doesn't pull the CUDA build.
+    [ "$(uname -s)" = Linux ] && .venv/bin/pip install -q torch==2.15.0 --index-url https://download.pytorch.org/whl/cpu
+    .venv/bin/pip install -q -r requirements.txt
+fi
+"$PY" -c "import torch" 2>/dev/null || { echo "torch missing from .venv: see README (Setup)" >&2; exit 1; }
 # Keep macOS awake during training; Linux runs the same commands directly.
 run_awake() {
     if [ "$(uname -s)" = Darwin ] && command -v caffeinate >/dev/null 2>&1; then
