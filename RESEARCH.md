@@ -1045,6 +1045,12 @@ round 1's result, so it is not independent of it (Y2).
   on commit `2f8b46f` (PR #17's head), because the J6 `mixed` run used an earlier commit. Before
   either starts, record Younis's confirmation here that the whole working tree, including `models/`,
   is clean. The run's `dirty` flag checks only `kora/`. Confirmation: pending.
+
+**Round 2 status (2026-11-08): deferred, not run.** No round-2 run was recorded before the team's run
+stop on 7 November (23:59), and no clean-tree confirmation was recorded. Production has since moved from
+`mixed` to `y16_seeds`, whose build drops the detector, and `y23_big2` is the next candidate, so a pass
+on `mixed` would not apply to either. The `mixed` pin is retired (removed from PR #17). Round 1's
+dropped result stands; any retry needs a new registration against the production of that time.
 ### [verified] V8: How does production hold up when the ball is missing far more often?
 
 **Why:** Nested evaluation copies are degraded with the camera-on estimate at a random severity,
