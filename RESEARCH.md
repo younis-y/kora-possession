@@ -1071,8 +1071,8 @@ round 1's result, so it is not independent of it (Y2).
 
 **Round 2 status (2026-11-08): deferred, not run.** No round-2 run was recorded before the team's run
 stop on 7 November (23:59), and no clean-tree confirmation was recorded. Production has since moved from
-`mixed` to `y16_seeds`, whose build drops the detector, and `y23_big2` is the next candidate, so a pass
-on `mixed` would not apply to either. The `mixed` pin is retired (removed from PR #17). Round 1's
+`mixed` to `y16_seeds` and then `y23_big2` (shipped 8 November, semi-Markov decoder with the detector),
+so a pass on `mixed` would not apply to either. The `mixed` pin is retired (removed from PR #17). Round 1's
 dropped result stands; any retry needs a new registration against the production of that time.
 ### [verified] V8: How does production hold up when the ball is missing far more often?
 
