@@ -2,8 +2,10 @@
 
 ## 1. Approach
 
-A frame classifier learns p(H, A, D | tracking around this frame) on **other matches**. A
-semi-Markov decoder then turns those probabilities into a label path with realistic possessions.
+A frame model learns p(H, A, D | tracking around this frame) on **other matches**: gradient-boosted
+trees over window summaries of the tracking, blended with a temporal convolutional network that reads
+the frames in order. A decoder then turns those probabilities into a label path with realistic
+possessions.
 Nothing in the pipeline is fitted to, tuned on, or selected with labels from the challenge match.
 
 Why learned rather than hand rules: every hand rule has a threshold, and with no labels on this
@@ -35,6 +37,8 @@ least 5 of the 7 matches improve.
 | cuts at detector peaks, mirror averaging, weak-touch peaks | dropped | on the mixed model (0.7511): 0.7549 (4/7), 0.7553 (4/7), 0.7497 (3/7) (`RESEARCH.md` Y10-Y12) |
 | touch-event model relabelling short spells | dropped | its gate passed (it finds 80 of 470 swallowed possessions where the detector finds 62), but relabelling scored 0.7521 vs 0.7511, 1/7 (`RESEARCH.md` Y13, Y14) |
 | filling short ball gaps | dropped | 0.7576 vs 0.7511 (4/7) alone; 0.7582 vs 0.7566 (3/7) on the submitted ensemble, so most of its gain was seed noise (`RESEARCH.md` Y15, Y18) |
+| other tree settings: LightGBM at the same settings, feature bagging, deeper trees, 1000 trees | not used | screened against the single-seed base (0.7516): 0.7488, 0.7521 (3/7), deeper stopped for compute. 1000 trees passed as a three-seed ensemble (0.7595 vs 0.7566, 5/7) but gained less than the temporal network; combining the two was pre-registered but not run (`RESEARCH.md` Y20, Y24) |
+| a smaller temporal network from one seed | dropped | 0.7673 (+0.0107, 7/7) with seed 2027 but 0.7577 (+0.0011, 4/7) with seed 2028: most of the gain was one seed's luck (`RESEARCH.md` Y22) |
 | SkillCorner possession events as labels (20 more test matches) | dropped by a pre-registered gate | labels derived from its player-possession events are coarser than the possession scored here: 136 possessions per 45 minutes against IDSSE's 206, median 5.7 s against 3.8 s. As a test set they would reward missing short possessions (`RESEARCH.md` Y19) |
 
 ## 3. Training data (all from other games)
@@ -114,6 +118,15 @@ velocity change in free flight during IDSSE live play, set without possession la
   classifiers whose degraded training copies and fits use seeds 2027, 2028 and 2029. One seed alone
   moves held-out spellF1 by up to ~0.018, more than most candidate changes, so the average is both a
   better model and a steadier baseline for later comparisons.
+- **Temporal network (`kora/seq.py`, `RESEARCH.md` Y22, Y23).** The trees see each frame through window
+  averages, which blur the order of events, and a short possession is an ordered pattern: a touch by
+  one team between touches by the other. A non-causal temporal convolutional network reads the same
+  frame features in order: 9 residual blocks of dilated 1-D convolutions (kernel 3, dilations 1 to 256,
+  96 channels), so each frame sees ±511 frames (about 20 s). It is trained on the same degraded copies
+  and balance weights as the trees (PyTorch, 3,000 steps on 3,072-frame windows that never cross a
+  half). Two networks, seeds 2027 and 2028, are averaged, and stage 1 is 0.75 × trees + 0.25 × network.
+  In pre-registered screens the weight 0.25 beat 0.5, and the network alone scored 0.7375, below the
+  trees: it adds to them rather than replacing them.
 - **Change detector:** a second model predicts, from windows of the classifier's out-of-fold
   probabilities and a few raw signals, whether a team change, a live/dead change or no change is
   within 0.2 s. Only its team-change probability is used.
@@ -124,10 +137,11 @@ velocity change in free flight during IDSSE live play, set without possession la
   whose detector target is a team change. Switching costs apply to a change of
   possession and to entering or leaving dead ball. A plain HMM Viterbi is the alternative. Which
   decoder and which costs are used is chosen inside the training folds only: for the submitted
-  ensemble, nested cross-validation picks the semi-Markov decoder on 5 of the 7 held-out matches. The
+  model, nested cross-validation picks the semi-Markov decoder on 3 of the 7 held-out matches. The
   submission build applies the same kind of rule once, over all seven matches (`kora/boundary.py`:
-  the semi-Markov decoder only if it wins on at least 5 of 7), and there it did not, so the submission
-  uses the plain decoder (switching costs 8 for a change of possession and 32 for dead ball).
+  the semi-Markov decoder only if it wins on at least 5 of 7). For the Y16 submission it did not; for
+  the submitted model it does (0.7675 against 0.7640 for the plain decoder), so the submission uses the
+  semi-Markov decoder (switching costs 4 for a change of possession and 16 for dead ball).
 
 ## 7. Possession rules implemented
 
@@ -153,13 +167,18 @@ they are learned tendencies, not hard constraints:
 | R1: + touch features | 0.7432 ± 0.0325 | | +0.0284, 6/7 better |
 | R2: + balanced weights | 0.7528 ± 0.0279 | 0.5726 | +0.0096, 6/7 |
 | J6: + mixed training | 0.7511 ± 0.0270 | 0.6607 | −0.0017; heavy gaps +0.0881, 7/7 |
-| **Y16: + three seed members (submitted)** | **0.7566 ± 0.0300** | **0.6783** | **+0.0055, 5/7; heavy gaps +0.0176, 6/7** |
+| Y16: + three seed members (submitted 6 Nov) | 0.7566 ± 0.0300 | 0.6783 | +0.0055, 5/7; heavy gaps +0.0176, 6/7 |
+| **Y23: + temporal network, two seeds (submitted)** | **0.7665 ± 0.0293** | **0.6822** | **+0.0099, 7/7; heavy gaps +0.0039, 4/7** |
 
 Each held-out match is excluded from the classifier, the detector, the duration prior and decoder
 selection, and scored once. "Heavy ball gaps" scores the same models on evaluation copies with
-label-free random ball gaps at 40% (section 4). With the plain decoder on every fold, as submitted,
-the ensemble scores 0.7554 (heavy gaps 0.6749). Recall of true possessions under 1 s rose from 0.21
-(B0) to 0.32, and for 1-2 s from 0.44 to 0.56; spellF1 at IoU 0.3 / 0.5 / 0.7 is 0.833 / 0.765 / 0.668.
+label-free random ball gaps at 40% (section 4); since J6 a candidate may not lose more than 0.01
+there. The network was kept only after its second seed passed too: one larger network scored +0.0103
+(seed 2027) and +0.0069 (seed 2028) against Y16, and the submission averages the two. With the plain
+decoder on every fold it scores 0.7638 (heavy gaps 0.6809), and with the semi-Markov decoder on
+every fold, as submitted, 0.7681 (heavy gaps 0.6836). Recall of true
+possessions under 1 s rose from 0.21 (B0) to 0.32, and for 1-2 s from 0.44 to 0.57; spellF1 at IoU
+0.3 / 0.5 / 0.7 is 0.840 / 0.776 / 0.677 (Y16: 0.833 / 0.765 / 0.668).
 
 ## 9. Limitations
 
@@ -173,7 +192,13 @@ the ensemble scores 0.7554 (heavy gaps 0.6749). Recall of true possessions under
 - **Seed noise is as large as most changes.** One seed alone moves held-out spellF1 by up to ~0.018,
   so a single-seed comparison can pass or fail the 5-of-7 rule by chance. The submitted three-seed
   average reduces this for later comparisons: the short ball-gap fill, +0.0065 on one seed, shrank
-  to +0.0016 on the average (`RESEARCH.md` Y15, Y18).
+  to +0.0016 on the average (`RESEARCH.md` Y15, Y18). The network showed the same: a small network's
+  +0.0107 on one seed was +0.0011 on another (Y22), so the submitted network is a two-seed average
+  whose seeds each passed on their own.
+- **The network's rebuild depends on hardware.** It is fitted on an Apple GPU (two fits of the smaller
+  network with the same seed gave identical predictions) and run on the CPU, so `kora.run` reproduces
+  the submission from the committed models on any machine. A from-scratch `build.sh` elsewhere refits
+  it, which is much slower without a GPU and may not match the committed hash bit for bit.
 - **The validation sees few ball gaps.** Normal evaluation copies are degraded with the camera-on
   estimate (about 6% of the ball missing), while the challenge ball is missing on 41% of graded
   frames. Every candidate since J6 is therefore also scored on heavy-gap copies (40% missing at
@@ -195,8 +220,8 @@ the ensemble scores 0.7554 (heavy gaps 0.6749). Recall of true possessions under
 - **Seven training matches, one league.** All labels are German top-two-division matches; the
   challenge match may differ in style and camera.
 - **With more time:** a video ball detector for the gaps (gated on licensed weights and external
-  calibration), a temporal model over the features instead of window averages, and more labelled
-  open matches.
+  calibration), the stronger tree settings combined with the network (`RESEARCH.md` Y24, pre-registered),
+  and more labelled open matches.
 
 ## 10. Reproduction
 
@@ -204,8 +229,9 @@ the ensemble scores 0.7554 (heavy gaps 0.6749). Recall of true possessions under
 ./build.sh                                     # venv, download, train, decode, check; fails on a hash mismatch
 .venv/bin/python -m kora.run --out "Kora Analytics.csv"   # submission from the committed models
 .venv/bin/python -m kora.nested --variant mixed           # single-seed base (about 1-2 h; folds are cached)
-.venv/bin/python -m kora.nested --variant y16_seeds       # nested cross-validation of the submitted ensemble
-.venv/bin/python -m kora.compare mixed y16_seeds          # paired comparison, with the keep rule
+.venv/bin/python -m kora.nested --variant y16_seeds       # the three-member tree ensemble (Y16)
+.venv/bin/python -m kora.nested --variant y23_big2        # the submitted model: Y16 + the network (GPU if present)
+.venv/bin/python -m kora.compare y16_seeds y23_big2       # paired comparison, with the keep rule
 ```
 
 Match data is gated and never committed; `data/` and every derived array are gitignored.

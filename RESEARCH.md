@@ -652,7 +652,9 @@ production; if not, the better parent is. If only one parent passes, that parent
 
 **Status (2026-11-07 23:59).** Both parents pass (`y23_big2` +0.0099, `y21_long` +0.0029; the better parent
 is `y23_big2`). Not run: the team stopped new model runs at 23:59. Until it runs, the rule's fallback holds:
-`y23_big2` is the production candidate. It is not built yet; the submitted file is still `y16_seeds`.
+`y23_big2` is the production candidate. **Shipped 2026-11-08** (production `y23_big2`, clean-checkout build of
+95bb677): validator valid, 199,320 lines, sha256 117c95d0...; the build kept the semi-Markov decoder
+(0.7675 vs plain 0.7640 over the seven matches) and the tree members are byte-identical to Y16's.
 
 ## Vladymyr — error metrics and decoder
 
