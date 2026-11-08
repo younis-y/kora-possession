@@ -16,7 +16,7 @@ import time
 import joblib
 import numpy as np
 
-from . import nested, train as _train
+from . import nested, seq, seqio, train as _train
 from .decode import decode
 from .external import MATCHES
 from .train import GRID_ALPHA, GRID_D, GRID_HA, MODELS, copies, fit_classifier, segments_of, spell_f1
@@ -56,6 +56,20 @@ def main():
             models.append(fit_classifier([c for m in MATCHES for c in copies(m)[0]]))
         print(f"member {s} fitted ({time.time() - t0:.0f} s)", flush=True)
     oof = {m: v / len(seeds) for m, v in oof.items()}
+    if CONFIG.get("seq"):              # Y22/Y23: blend the temporal network(s) in, as kora.nested did
+        sc, data = CONFIG["seq"], {m: copies(m) for m in MATCHES}
+        seeds, evs = sc.get("seeds") or [sc["seed"]], {_train.FEATURE_VERSION: {m: ev[m][0] for m in MATCHES}}
+        net = {m: 0 for m in MATCHES}
+        for s in seeds:                # leave-one-match-out probabilities: kora.nested's cached single fits
+            p = nested.seq_stage1(data, evs, {**sc, "seed": s}, pairs=False)[_train.FEATURE_VERSION]
+            net = {m: net[m] + p[frozenset([m]), m] / len(seeds) for m in MATCHES}
+            model = seq.fit([c for m in MATCHES for c in data[m][0]],
+                            [ev[m][2] for m in MATCHES for _ in data[m][0]], s, CONFIG.get("balance") or 0.0,
+                            sc.get("settings"))
+            seqio.save(model, MODELS / f"seq_{s}.pt")
+            print(f"temporal network {s} fitted ({time.time() - t0:.0f} s)", flush=True)
+        oof = {m: (1 - sc["weight"]) * v + sc["weight"] * net[m] for m, v in oof.items()}
+        cfg["seq"] = {"weight": sc["weight"], "seeds": seeds}
     best = pick_decoder(oof, ev, np.array(cfg["prior"]))
     print(f"plain decoder on the average: spellF1 {best[0]:.4f} +- {best[1]:.4f}  alpha {best[3]}  "
           f"cost_HA {best[4]}  cost_D {best[5]}  (one model: {cfg['cv_spell_f1_mean']:.4f})")

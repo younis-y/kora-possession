@@ -7,7 +7,7 @@ from unittest import mock
 import numpy as np
 import pandas as pd
 
-from kora import engine, seq, train, variant
+from kora import engine, seq, seqio, train, variant
 
 HAS = {m: importlib.util.find_spec(m) is not None for m in ("lightgbm", "torch")}
 
@@ -87,6 +87,32 @@ class Y22Tests(unittest.TestCase):
         self.assertEqual(p.shape, (n, 3))
         np.testing.assert_allclose(p.sum(1), 1, rtol=1e-5)
 
+    @unittest.skipUnless(HAS["torch"], "torch not installed (Y22 research dependency)")
+    def test_saved_model_predicts_the_same_on_the_cpu(self):
+        # In a fresh process: torch's CPU threads deadlock on macOS once LightGBM's OpenMP is loaded,
+        # which the Y20 tests above do (the build never loads both).
+        import subprocess
+        import sys
+        code = """
+import tempfile
+import numpy as np, pandas as pd
+from kora import seqio
+rng = np.random.default_rng(2)
+X = pd.DataFrame(rng.normal(size=(200, 3)), columns=list("abc"))
+y = np.repeat([0, 1], 100).astype(np.int64)
+half = np.ones(200, np.int8)
+small = {"steps": 4, "length": 64, "batch": 2, "channels": 8, "blocks": 2}
+from kora import seq
+a = seq.fit([(X, y)], [half], 2027, 0.5, small)
+pa = seqio.predict_cpu(a, X, half)
+np.testing.assert_array_equal(pa, seqio.predict_cpu(a, X, half))
+with tempfile.TemporaryDirectory() as d:
+    seqio.save(a, d + "/seq.pt")
+    np.testing.assert_array_equal(seqio.predict_cpu(seqio.load(d + "/seq.pt"), X, half), pa)
+print("ok")
+"""
+        out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=120)
+        self.assertEqual(out.stdout.strip(), "ok", out.stderr[-2000:])
 
 if __name__ == "__main__":
     unittest.main()

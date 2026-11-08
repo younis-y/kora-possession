@@ -13,6 +13,7 @@ import joblib
 import numpy as np
 import pandas as pd
 
+from . import seqio
 from .boundary import context
 from .decode import decode, decode_hsmm
 from .features import build
@@ -34,6 +35,10 @@ def predict():
     bundle = joblib.load(MODELS / "classifier.joblib")
     cfg = json.loads((MODELS / "decoder.json").read_text())
     proba = stage1(bundle, X)
+    if "seq" in cfg:                          # Y22/Y23: the temporal network(s), blended as in kora.ensemble
+        w, seeds = cfg["seq"]["weight"], cfg["seq"]["seeds"]
+        net = np.mean([seqio.predict_cpu(seqio.load(MODELS / f"seq_{s}.pt"), X, section) for s in seeds], axis=0)
+        proba = (1 - w) * proba + w * net
     prior = np.array(cfg["prior"])
     if "hsmm" in cfg:                         # kept only if it won leave-one-match-out CV
         h = cfg["hsmm"]
