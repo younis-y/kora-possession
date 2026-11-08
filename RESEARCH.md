@@ -635,7 +635,7 @@ against `y16_seeds` (0.7566; heavy gaps 0.6783). `y23_seeds2` +0.0080, 6/7 (heav
 0.6783 -> 0.6822 (+0.0039, 4/7), inside V8. **Winner: `y23_big2`** (largest mean delta among the passers;
 no disjoint replicate, as amended 18:28). Unlike Y22's small network, the larger one holds across seeds.
 
-### [pending] Y24: Do the Y20 trees and the Y23 network add up?
+### [dropped] Y24: Do the Y20 trees and the Y23 network add up?
 
 **Why (2026-11-07).** Y20 (`y20_long`, more capacity in the trees) and Y23 (a temporal network blended
 into stage 1) change different parts of stage 1, so if both pass, their gains may add.
@@ -658,7 +658,7 @@ is `y23_big2`). Not run: the team stopped new model runs at 23:59. Until it runs
 
 **Run (2026-11-08, owner: "run some more models").** `y24` defined as registered and run with Y25 below.
 
-### [pending] Y25: Does a third network seed, or more network weight, add to y23_big2?
+### [dropped] Y25: Does a third network seed, or more network weight, add to y23_big2?
 
 **Why (2026-11-08).** Y23 showed seed averaging steadies the network (small network: one seed +0.0107,
 the other +0.0011), and Y22 picked weight 0.25 for the small network only; the larger one is stronger
@@ -682,8 +682,8 @@ CPU inference in a subprocess (as `tests/test_y19_y20.py` does) or with `torch.s
 
 **Outcome so far (2026-11-08, 81bcce9, clean checkout).** `y24` 0.7634 against `y23_big2` 0.7665
 (-0.0031, median -0.0044, better on 3 of 7): fails; its heavy-gap twin was not finished (battery).
-`y25_half` 0.7630 (-0.0034, 2 of 7), heavy gaps 0.6822 -> 0.6848 (+0.0025, 4/7): fails. `y25_big3`
-running. Bundles for `y16_seeds` and `y23_big2` (+ `_rand`) are in release `nested-y23`.
+`y25_half` 0.7630 (-0.0034, 2 of 7), heavy gaps 0.6822 -> 0.6848 (+0.0025, 4/7): fails. `y25_big3` 0.7671
+(+0.0006, median -0.0011, 3/7), heavy gaps 0.6798 (-0.0024, 2/7): fails. No winner; production stays `y23_big2`. Bundles for `y16_seeds` and `y23_big2` (+ `_rand`) are in release `nested-y23`.
 
 ## Vladymyr — error metrics and decoder
 
