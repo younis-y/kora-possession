@@ -486,7 +486,7 @@ to fix; as a test set they would reward swallowing them. G4 (reported only): `y1
 0.452, `touch_bal` 0.458. Mixed is not ahead of touch_bal on these real gaps, and the ensemble's lead
 comes partly from predicting fewer spells (1,339 against 1,491), which these labels reward.
 
-### [pending] Y20: Does another stage-1 classifier, or more capacity, help?
+### [verified] Y20: Does another stage-1 classifier, or more capacity, help?
 
 **Why (2026-11-07).** Stage 1 still uses the day-one HistGradientBoosting settings (250 trees, learning
 rate 0.1, 63 leaves, at least 200 rows per leaf), and every fit runs all 250 iterations, so its early
@@ -530,6 +530,10 @@ reuse the cached trees). Stage A runs for `y20_long` only (`y20_bag` failed its 
 `y20_long`: `kora.compare mixed y20_long` 0.7511 -> 0.7576 (+0.0065, median +0.0050), better on 5 of 7
 (min -0.0052, max +0.0213); recall under 1 s 0.263 -> 0.307; heavy gaps `mixed_rand` -> `y20_long_rand`
 0.6607 -> 0.6670 (+0.0063, 5/7). So it passes Stage A; Stage B (`y21_long`) is running.
+
+**Stage B (2026-11-07, 8ffce8f, clean checkout).** `kora.compare y16_seeds y21_long` 0.7566 -> 0.7595
+(+0.0029, median +0.0061), better on 5 of 7 (min -0.0173, max +0.0150); heavy gaps `y16_seeds_rand` ->
+`y21_long_rand` 0.6783 -> 0.6818 (+0.0035, 4/7), inside V8. Y20 passes; `y21_long` is a Y24 parent.
 
 ### [dropped] Y22: Does a temporal network over the frame features help as a stage-1 member? (S3)
 
@@ -590,7 +594,7 @@ of 7 (min -0.0076, max +0.0088); recall under 1 s 0.294. Against the seed-2027 r
 is very seed-dependent. Y23's seed averages test whether a seed-robust gain remains (against
 `y16_seeds`, as its rule says when Stage B fails).
 
-### [pending] Y23: Does averaging the temporal network over seeds, or a larger one, add to Y22?
+### [verified] Y23: Does averaging the temporal network over seeds, or a larger one, add to Y22?
 
 **Why (2026-11-07).** Alone the network is weaker than the trees (Y22 screen 0.7375 against 0.7575) and,
 like any single fit, noisy; Y16 showed that averaging seeds helps the trees. A larger receptive field
@@ -623,7 +627,13 @@ fits), which must pass the same rule; the winner is then the largest mean delta 
 its independent seed). Also recorded: `y23_seeds3` 0.7641 (+0.0075, 7/7, min +0.0026), heavy gaps 0.6808
 (+0.0025, 5/7): passes.
 
-**Outcome:** —
+**Outcome (2026-11-07, clean checkouts at 4f839b4 and c757ffb).** Y22's Stage B failed, so all are judged
+against `y16_seeds` (0.7566; heavy gaps 0.6783). `y23_seeds2` +0.0080, 6/7 (heavy gaps +0.0076, 5/7);
+`y23_seeds3` +0.0075, 7/7 (+0.0025, 5/7); `y23_big` 0.7669 +0.0103, 7/7 (+0.0021, 5/7); `y23_big_s2028`
+0.7635 +0.0069, 6/7 (heavy gaps -0.0007, 3/7, inside V8). Both big seeds pass, so `y23_big2` was run:
+0.7566 -> 0.7665 (+0.0099, median +0.0087), better on all 7 (min +0.0019, max +0.0201); heavy gaps
+0.6783 -> 0.6822 (+0.0039, 4/7), inside V8. **Winner: `y23_big2`** (largest mean delta among the passers;
+no disjoint replicate, as amended 18:28). Unlike Y22's small network, the larger one holds across seeds.
 
 ### [pending] Y24: Do the Y20 trees and the Y23 network add up?
 
@@ -640,7 +650,9 @@ training copies).
 (mean up, at least 5 of 7) and the `_rand` twin not lower by more than 0.01 (V8). If it passes, `y24` is
 production; if not, the better parent is. If only one parent passes, that parent is production.
 
-**Outcome:** —
+**Status (2026-11-07 23:59).** Both parents pass (`y23_big2` +0.0099, `y21_long` +0.0029; the better parent
+is `y23_big2`). Not run: the team stopped new model runs at 23:59. Until it runs, the rule's fallback holds:
+`y23_big2` is the production candidate. It is not built yet; the submitted file is still `y16_seeds`.
 
 ## Vladymyr — error metrics and decoder
 

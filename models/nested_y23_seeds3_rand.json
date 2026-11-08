@@ -1,0 +1,433 @@
+{
+  "schema": 1,
+  "fps": 25,
+  "matches": [
+    "J03WPY",
+    "J03WN1",
+    "J03WMX",
+    "J03WOH",
+    "J03WQQ",
+    "J03WOY",
+    "J03WR9"
+  ],
+  "provenance": "kora.nested: each held-out match excluded from stage 1, the detector, the prior, the rate, the duration prior and decoder selection; scored once. Ball and player gaps are simulated from external measurements (kora/degrade.py), not challenge tracking.",
+  "commit": "4f839b48ff0272f583c11b167722b9ae30f01c32",
+  "dirty": false,
+  "seed": 2027,
+  "variant": "y23_seeds3_rand",
+  "config": {
+    "touch": true,
+    "balance": 0.5,
+    "mixed": true,
+    "eval_rand": true,
+    "ensemble": [
+      2027,
+      2028,
+      2029
+    ],
+    "seq": {
+      "weight": 0.25,
+      "seed": 2027,
+      "settings": {},
+      "seeds": [
+        2027,
+        2028,
+        2029
+      ]
+    }
+  },
+  "feature_version": "f35df1985d1",
+  "stage1_version": "f35df1985d1s6612537f8e",
+  "inner_wins": 5,
+  "decoder": {
+    "inner_wins": 5,
+    "plain_grid": null,
+    "hsmm_grid": null,
+    "refine": false,
+    "cuts": null,
+    "events": null
+  },
+  "detector": {
+    "ha_priority": false
+  },
+  "train_copies": 2,
+  "subsample": 6,
+  "spell_f1_mean": 0.6808139857989145,
+  "spell_f1_std": 0.018888558388089578,
+  "spell_f1_plain_mean": 0.6841244859665613,
+  "spell_f1_hsmm_mean": 0.684888214687833,
+  "spell_f1_nocut_mean": 0.6808139857989145,
+  "folds": {
+    "J03WPY": {
+      "inner_matches": [
+        "J03WN1",
+        "J03WMX",
+        "J03WOH",
+        "J03WQQ",
+        "J03WOY",
+        "J03WR9"
+      ],
+      "decoder": "plain",
+      "plain": {
+        "alpha": 0.0,
+        "cost_ha": 8,
+        "cost_d": 16,
+        "inner_mean": 0.6782011737041188
+      },
+      "hsmm": {
+        "cost_ha": 4,
+        "cost_d": 16,
+        "w_dur": 4,
+        "beta": 4,
+        "ha_bonus_only": false,
+        "inner_mean": 0.6766817899083596,
+        "rate": 0.02536110238504319
+      },
+      "prior": [
+        0.27531683258489154,
+        0.27531683258489154,
+        0.449366334830217
+      ],
+      "spell_f1": 0.6944881889763781,
+      "spell_f1_per_iou": {
+        "0.3": 0.7716535433070866,
+        "0.4": 0.7375328083989502,
+        "0.5": 0.7060367454068243,
+        "0.6": 0.6535433070866142,
+        "0.7": 0.6036745406824148
+      },
+      "n_true": 421,
+      "n_pred": 341,
+      "spell_f1_plain": 0.6944881889763781,
+      "spell_f1_hsmm": 0.7061333333333332,
+      "spell_f1_nocut": 0.6944881889763781,
+      "cuts": {
+        "theta": null,
+        "gap": null
+      },
+      "spell_f1_noevent": 0.6944881889763781,
+      "events": {
+        "theta": null,
+        "max_len": null
+      }
+    },
+    "J03WN1": {
+      "inner_matches": [
+        "J03WPY",
+        "J03WMX",
+        "J03WOH",
+        "J03WQQ",
+        "J03WOY",
+        "J03WR9"
+      ],
+      "decoder": "plain",
+      "plain": {
+        "alpha": 0.0,
+        "cost_ha": 8,
+        "cost_d": 16,
+        "inner_mean": 0.6835097163924057
+      },
+      "hsmm": {
+        "cost_ha": 2,
+        "cost_d": 8,
+        "w_dur": 3,
+        "beta": 3,
+        "ha_bonus_only": false,
+        "inner_mean": 0.6842161789653369,
+        "rate": 0.024345902436094056
+      },
+      "prior": [
+        0.2814494551130188,
+        0.2814494551130188,
+        0.4371010897739625
+      ],
+      "spell_f1": 0.6850828729281768,
+      "spell_f1_per_iou": {
+        "0.3": 0.7911602209944751,
+        "0.4": 0.7469613259668509,
+        "0.5": 0.6806629834254144,
+        "0.6": 0.6298342541436465,
+        "0.7": 0.5767955801104973
+      },
+      "n_true": 500,
+      "n_pred": 405,
+      "spell_f1_plain": 0.6850828729281768,
+      "spell_f1_hsmm": 0.6938325991189427,
+      "spell_f1_nocut": 0.6850828729281768,
+      "cuts": {
+        "theta": null,
+        "gap": null
+      },
+      "spell_f1_noevent": 0.6850828729281768,
+      "events": {
+        "theta": null,
+        "max_len": null
+      }
+    },
+    "J03WMX": {
+      "inner_matches": [
+        "J03WPY",
+        "J03WN1",
+        "J03WOH",
+        "J03WQQ",
+        "J03WOY",
+        "J03WR9"
+      ],
+      "decoder": "plain",
+      "plain": {
+        "alpha": 0.0,
+        "cost_ha": 8,
+        "cost_d": 16,
+        "inner_mean": 0.6932615210938103
+      },
+      "hsmm": {
+        "cost_ha": 8,
+        "cost_d": 8,
+        "w_dur": 2,
+        "beta": 4,
+        "ha_bonus_only": false,
+        "inner_mean": 0.6916727521835826,
+        "rate": 0.024309798472450992
+      },
+      "prior": [
+        0.273003599893544,
+        0.273003599893544,
+        0.453992800212912
+      ],
+      "spell_f1": 0.6469135802469135,
+      "spell_f1_per_iou": {
+        "0.3": 0.7407407407407407,
+        "0.4": 0.7160493827160493,
+        "0.5": 0.6531986531986532,
+        "0.6": 0.5970819304152637,
+        "0.7": 0.5274971941638608
+      },
+      "n_true": 511,
+      "n_pred": 380,
+      "spell_f1_plain": 0.6469135802469135,
+      "spell_f1_hsmm": 0.6575280898876404,
+      "spell_f1_nocut": 0.6469135802469135,
+      "cuts": {
+        "theta": null,
+        "gap": null
+      },
+      "spell_f1_noevent": 0.6469135802469135,
+      "events": {
+        "theta": null,
+        "max_len": null
+      }
+    },
+    "J03WOH": {
+      "inner_matches": [
+        "J03WPY",
+        "J03WN1",
+        "J03WMX",
+        "J03WQQ",
+        "J03WOY",
+        "J03WR9"
+      ],
+      "decoder": "hsmm",
+      "plain": {
+        "alpha": 0.0,
+        "cost_ha": 8,
+        "cost_d": 16,
+        "inner_mean": 0.6786666173211744
+      },
+      "hsmm": {
+        "cost_ha": 4,
+        "cost_d": 16,
+        "w_dur": 2,
+        "beta": 3,
+        "ha_bonus_only": false,
+        "inner_mean": 0.6831600982833393,
+        "rate": 0.025328996752386843
+      },
+      "prior": [
+        0.277972282499428,
+        0.277972282499428,
+        0.4440554350011439
+      ],
+      "spell_f1": 0.7013123359580051,
+      "spell_f1_per_iou": {
+        "0.3": 0.8083989501312335,
+        "0.4": 0.7742782152230973,
+        "0.5": 0.7112860892388451,
+        "0.6": 0.6456692913385826,
+        "0.7": 0.5669291338582678
+      },
+      "n_true": 402,
+      "n_pred": 360,
+      "spell_f1_plain": 0.7157333333333333,
+      "spell_f1_hsmm": 0.7013123359580051,
+      "spell_f1_nocut": 0.7013123359580051,
+      "cuts": {
+        "theta": null,
+        "gap": null
+      },
+      "spell_f1_noevent": 0.7013123359580051,
+      "events": {
+        "theta": null,
+        "max_len": null
+      }
+    },
+    "J03WQQ": {
+      "inner_matches": [
+        "J03WPY",
+        "J03WN1",
+        "J03WMX",
+        "J03WOH",
+        "J03WOY",
+        "J03WR9"
+      ],
+      "decoder": "plain",
+      "plain": {
+        "alpha": 0.0,
+        "cost_ha": 8,
+        "cost_d": 16,
+        "inner_mean": 0.6834812031363898
+      },
+      "hsmm": {
+        "cost_ha": 4,
+        "cost_d": 16,
+        "w_dur": 3,
+        "beta": 4,
+        "ha_bonus_only": false,
+        "inner_mean": 0.6893403549006183,
+        "rate": 0.025464311609917713
+      },
+      "prior": [
+        0.27240297102207345,
+        0.27240297102207345,
+        0.4551940579558531
+      ],
+      "spell_f1": 0.6843312101910828,
+      "spell_f1_per_iou": {
+        "0.3": 0.7847133757961783,
+        "0.4": 0.7414012738853503,
+        "0.5": 0.6878980891719746,
+        "0.6": 0.6420382165605096,
+        "0.7": 0.5656050955414014
+      },
+      "n_true": 401,
+      "n_pred": 384,
+      "spell_f1_plain": 0.6843312101910828,
+      "spell_f1_hsmm": 0.681841432225064,
+      "spell_f1_nocut": 0.6843312101910828,
+      "cuts": {
+        "theta": null,
+        "gap": null
+      },
+      "spell_f1_noevent": 0.6843312101910828,
+      "events": {
+        "theta": null,
+        "max_len": null
+      }
+    },
+    "J03WOY": {
+      "inner_matches": [
+        "J03WPY",
+        "J03WN1",
+        "J03WMX",
+        "J03WOH",
+        "J03WQQ",
+        "J03WR9"
+      ],
+      "decoder": "hsmm",
+      "plain": {
+        "alpha": 0.0,
+        "cost_ha": 8,
+        "cost_d": 32,
+        "inner_mean": 0.6810604130905643
+      },
+      "hsmm": {
+        "cost_ha": 4,
+        "cost_d": 16,
+        "w_dur": 2,
+        "beta": 3,
+        "ha_bonus_only": false,
+        "inner_mean": 0.6859957910154971,
+        "rate": 0.024925699465665318
+      },
+      "prior": [
+        0.27717398886672157,
+        0.27717398886672157,
+        0.4456520222665569
+      ],
+      "spell_f1": 0.6583732057416267,
+      "spell_f1_per_iou": {
+        "0.3": 0.7583732057416269,
+        "0.4": 0.715311004784689,
+        "0.5": 0.6770334928229664,
+        "0.6": 0.6004784688995216,
+        "0.7": 0.5406698564593301
+      },
+      "n_true": 456,
+      "n_pred": 380,
+      "spell_f1_plain": 0.6700361010830326,
+      "spell_f1_hsmm": 0.6583732057416267,
+      "spell_f1_nocut": 0.6583732057416267,
+      "cuts": {
+        "theta": null,
+        "gap": null
+      },
+      "spell_f1_noevent": 0.6583732057416267,
+      "events": {
+        "theta": null,
+        "max_len": null
+      }
+    },
+    "J03WR9": {
+      "inner_matches": [
+        "J03WPY",
+        "J03WN1",
+        "J03WMX",
+        "J03WOH",
+        "J03WQQ",
+        "J03WOY"
+      ],
+      "decoder": "hsmm",
+      "plain": {
+        "alpha": 0.0,
+        "cost_ha": 4,
+        "cost_d": 8,
+        "inner_mean": 0.6773748204354176
+      },
+      "hsmm": {
+        "cost_ha": 8,
+        "cost_d": 16,
+        "w_dur": 2,
+        "beta": 4,
+        "ha_bonus_only": false,
+        "inner_mean": 0.6842802534226862,
+        "rate": 0.025931087025074517
+      },
+      "prior": [
+        0.2733015051773333,
+        0.2733015051773333,
+        0.45339698964533337
+      ],
+      "spell_f1": 0.6951965065502184,
+      "spell_f1_per_iou": {
+        "0.3": 0.7947598253275109,
+        "0.4": 0.7656477438136827,
+        "0.5": 0.7161572052401746,
+        "0.6": 0.6229985443959243,
+        "0.7": 0.5764192139737991
+      },
+      "n_true": 370,
+      "n_pred": 317,
+      "spell_f1_plain": 0.6922861150070126,
+      "spell_f1_hsmm": 0.6951965065502184,
+      "spell_f1_nocut": 0.6951965065502184,
+      "cuts": {
+        "theta": null,
+        "gap": null
+      },
+      "spell_f1_noevent": 0.6951965065502184,
+      "events": {
+        "theta": null,
+        "max_len": null
+      }
+    }
+  }
+}
