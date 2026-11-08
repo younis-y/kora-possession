@@ -87,11 +87,6 @@ def with_detector(base, **settings):
     return config
 
 
-
-# RESEARCH.md V7 round 2, pinned base: Y9 kept no candidate (Y7a, Y7c, Y8a and Y8b were dropped), so the
-# post-Y9 production is mixed. Pinned by name so it never follows later changes of PRODUCTION.
-VARIANTS["v7r2"] = with_detector("mixed", ha_priority=True)
-
 def _name():
     if "--variant" in sys.argv:
         i = sys.argv.index("--variant")

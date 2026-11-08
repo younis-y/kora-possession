@@ -84,7 +84,7 @@ class TargetTests(unittest.TestCase):
         # Every existing default and pinned base keeps its own feature/stage-1 cache keys.
         for name, config in variant.VARIANTS.items():
             with self.subTest(variant=name):
-                self.assertEqual(variant.detector(json.loads(json.dumps(config))), {"ha_priority": name in ("v7_ha_priority", "v7r2")})
+                self.assertEqual(variant.detector(json.loads(json.dumps(config))), {"ha_priority": name == "v7_ha_priority"})
         for base in ("touch_bal", "y8a_dwell", "b0"):
             with self.subTest(base=base):
                 pinned = variant.with_detector(base, ha_priority=True)
@@ -94,10 +94,6 @@ class TargetTests(unittest.TestCase):
                         self.assertEqual(version(pinned), version(variant.VARIANTS[base]))
                 self.assertNotIn(Path(variant.__file__).resolve(), [c.args[0] for c in reads.call_args_list])
                 self.assertEqual(json.loads(json.dumps(pinned)), pinned)
-        # V7 round 2 is pinned to mixed (post-Y9 production) and reuses its caches.
-        self.assertEqual(variant.VARIANTS["v7r2"], {**variant.VARIANTS["mixed"], "detector": {"ha_priority": True}})
-        for version in (variant.feature_version, variant.stage1_version):
-            self.assertEqual(version(variant.VARIANTS["v7r2"]), version(variant.VARIANTS["mixed"]))
         pinned = variant.with_detector("touch_bal", ha_priority=True)
         self.assertEqual(pinned, candidate)
         self.assertNotIn("detector", baseline)
