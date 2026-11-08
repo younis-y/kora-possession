@@ -1171,6 +1171,43 @@ In these stressed copies, 206 of 346 missed true possessions under 1 s were clas
 the other team; 31 had any missing-ball frames. These descriptive counts do not establish why the
 possessions were missed. Report only.
 
+### [verified] V9: Where does `y23_big2` gain over `y16_seeds`?
+
+**Why (2026-11-08).** This item reports `kora.errors --compare` and the V1–V4 diagnostics for the shipped
+`y23_big2` against `y16_seeds`. Report only: it selects nothing and changes no rule.
+
+**Inputs.** Release `nested-y23`: `nested_y16_seeds`, `nested_y16_seeds_rand`, `nested_y23_big2` and
+`nested_y23_big2_rand` prediction bundles. All four match the SHA-256s in the release notes, and their
+means reproduce the JSONs (0.7566, 0.6783, 0.7665, 0.6822). Both pairs pass the pairing check (match
+order, labels, half, frame, ball visibility). `kora.errors` as of `bd098f9`, 1,000 draws, seed 0.
+
+**Normal copies** (`y16_seeds` → `y23_big2`): +0.0099, better on 7 of 7. Paired possession bootstrap
++0.0051 to +0.0149 (5th–95th), match bootstrap +0.0066 to +0.0134. Most of the gain is precision:
+invented possessions at IoU 0.5 fall from 519 to 475 and predicted possessions from 2,732 to 2,710
+(3,061 true). Missed possessions fall from 848 to 826, mostly at 1 s and longer (1–2 s: 237 → 229;
+2–4 s: 197 → 187); "absorbed by the other team" falls from 399 to 382. Under 1 s, recall at IoU 0.5 is
+almost unchanged: 123 → 124 of 384.
+
+**Heavy-gap copies** (`y16_seeds_rand` → `y23_big2_rand`): +0.0039, better on 4 of 7 (−0.0155 to
++0.0239). Paired possession bootstrap −0.0023 to +0.0103, with 85.1% of draws above zero; match
+bootstrap −0.0039 to +0.0118. Recall under 1 s at IoU 0.5 rises from 75 to 87 of 384 and for 1–2 s
+from 210 to 217 of 535, but invented possessions rise from 590 to 625. Under these random gaps, the
+missed possessions under 1 s have 43.0% of their frames without the ball (1,659 of 3,855) against 0.9%
+for the found ones (14 of 1,491); on normal copies the shares are 0.5% and 1.4%.
+
+On normal copies `y23_big2` has fewer split components (62 → 54) and more merge components (169 → 180).
+Its higher score accompanies fewer invented possessions and fewer missed possessions lasting at least
+1 s; recovery under 1 s barely changes. These describe seven matches already used for
+development; the intervals are descriptive, not a significance test.
+
+### [deferred] V10: How does PathCRF compare with our models on matched players-only inputs?
+
+**Outcome (2026-11-08):** considered, not run. A matched, report-only trial (S5's PathCRF) was drafted but
+not registered. PathCRF is trained on event-derived possession edges, so it would need its supervision
+adapted to our team-possession labels, and the paper reports about 565 s per epoch at 5 fps on an RTX
+4090. On 8 November the team agreed to skip it because seven-fold training was judged infeasible
+before the deadline.
+
 ## José — missing-ball robustness and extra data
 
 ### [verified] J1: Does the score depend on one blackout simulation?
