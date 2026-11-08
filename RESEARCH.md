@@ -673,9 +673,17 @@ alone, so it may deserve more weight.
 lower than `y23_big2_rand` by more than 0.01 (V8). Winner = largest mean delta among `y24`, `y25_big3`,
 `y25_half`. Second-seed check: if `y25_half` wins, `y25_half_r` (weight 0.5, network seeds 2028 and 2029)
 must pass the same checks; `y25_big3` is itself a seed average and `y24`'s parents each passed alone.
-Promoted only then; deploying `y24` also needs the LightGBM+torch deadlock workaround (README notes).
+Promoted only then; deploying `y24` would also have needed the LightGBM+torch workaround below.
 
-**Outcome:** —
+**LightGBM + torch on macOS (found 7 Nov).** Once LightGBM has loaded its OpenMP runtime, torch's CPU
+convolutions in the same process can hang at 0% CPU (two OpenMP runtimes). MPS (GPU) fits are not
+affected, and the shipped build never loads LightGBM. A build that needs both should run the network's
+CPU inference in a subprocess (as `tests/test_y19_y20.py` does) or with `torch.set_num_threads(1)`.
+
+**Outcome so far (2026-11-08, 81bcce9, clean checkout).** `y24` 0.7634 against `y23_big2` 0.7665
+(-0.0031, median -0.0044, better on 3 of 7): fails; its heavy-gap twin was not finished (battery).
+`y25_half` 0.7630 (-0.0034, 2 of 7), heavy gaps 0.6822 -> 0.6848 (+0.0025, 4/7): fails. `y25_big3`
+running. Bundles for `y16_seeds` and `y23_big2` (+ `_rand`) are in release `nested-y23`.
 
 ## Vladymyr — error metrics and decoder
 
