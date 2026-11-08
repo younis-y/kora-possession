@@ -656,6 +656,27 @@ is `y23_big2`). Not run: the team stopped new model runs at 23:59. Until it runs
 95bb677): validator valid, 199,320 lines, sha256 117c95d0...; the build kept the semi-Markov decoder
 (0.7675 vs plain 0.7640 over the seven matches) and the tree members are byte-identical to Y16's.
 
+**Run (2026-11-08, owner: "run some more models").** `y24` defined as registered and run with Y25 below.
+
+### [pending] Y25: Does a third network seed, or more network weight, add to y23_big2?
+
+**Why (2026-11-08).** Y23 showed seed averaging steadies the network (small network: one seed +0.0107,
+the other +0.0011), and Y22 picked weight 0.25 for the small network only; the larger one is stronger
+alone, so it may deserve more weight.
+
+**Candidates (pre-registered 2026-11-08 13:30, before any run).** Each is `y23_big2` with one change:
+- `y25_big3`: the larger network averaged over seeds 2027, 2028 and 2029 (28 new fits for 2029).
+- `y25_half`: network weight 0.5 instead of 0.25 (no new fits).
+`y24` (Y24) runs in the same round.
+
+**Decision rule.** Against `y23_big2`: keep rule (mean up, at least 5 of 7) and the `_rand` twin not
+lower than `y23_big2_rand` by more than 0.01 (V8). Winner = largest mean delta among `y24`, `y25_big3`,
+`y25_half`. Second-seed check: if `y25_half` wins, `y25_half_r` (weight 0.5, network seeds 2028 and 2029)
+must pass the same checks; `y25_big3` is itself a seed average and `y24`'s parents each passed alone.
+Promoted only then; deploying `y24` also needs the LightGBM+torch deadlock workaround (README notes).
+
+**Outcome:** —
+
 ## Vladymyr — error metrics and decoder
 
 ### [verified] V1: Are possessions merged, split, or miscounted?

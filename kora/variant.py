@@ -104,6 +104,15 @@ for _k, _sq in (("seeds2", {"seeds": [2027, 2028]}), ("seeds3", {"seeds": [2027,
     _sq = {"weight": 0.25, "seed": 2027, "settings": {}, **_sq}
     VARIANTS[f"y23_{_k}"] = {**VARIANTS["y16_seeds"], "seq": _sq}
     VARIANTS[f"y23_{_k}_rand"] = {**VARIANTS["y16_seeds_rand"], "seq": _sq}
+# RESEARCH.md Y24 (pre-registered 2026-11-07): y21_long's trees + y23_big2's networks. Y25 (2026-11-08): y23_big2
+# with a third network seed, or the networks at weight 0.5; _r is the half-weight candidate's seed replicate.
+VARIANTS["y24"] = {**VARIANTS["y21_long"], "seq": VARIANTS["y23_big2"]["seq"]}
+VARIANTS["y24_rand"] = {**VARIANTS["y21_long_rand"], "seq": VARIANTS["y23_big2"]["seq"]}
+for _k, _sq in (("big3", {"seeds": [2027, 2028, 2029]}), ("half", {"weight": 0.5}),
+                ("half_r", {"weight": 0.5, "seeds": [2028, 2029]})):
+    _sq = {**VARIANTS["y23_big2"]["seq"], **_sq}
+    VARIANTS[f"y25_{_k}"] = {**VARIANTS["y16_seeds"], "seq": _sq}
+    VARIANTS[f"y25_{_k}_rand"] = {**VARIANTS["y16_seeds_rand"], "seq": _sq}
 PRODUCTION = "y23_big2"     # Y23: y16_seeds + larger temporal network (2 seeds), 7/7 over y16_seeds (was y16_seeds)
 FEATURE_KEYS = ("touch", "mixed", "eval_rand")
 TRAIN_KEYS = ("balance",)
