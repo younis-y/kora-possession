@@ -685,7 +685,29 @@ CPU inference in a subprocess (as `tests/test_y19_y20.py` does) or with `torch.s
 `y25_half` 0.7630 (-0.0034, 2 of 7), heavy gaps 0.6822 -> 0.6848 (+0.0025, 4/7): fails. `y25_big3` 0.7671
 (+0.0006, median -0.0011, 3/7), heavy gaps 0.6798 (-0.0024, 2/7): fails. No winner; production stays `y23_big2`. Bundles for `y16_seeds` and `y23_big2` (+ `_rand`) are in release `nested-y23`.
 
-### [pending] Y26: Is the decoder we ship tuned for the wrong amount of missing ball?
+### [dropped] Y26: Is the decoder we ship tuned for the wrong amount of missing ball?
+
+**Outcome (2026-11-09):** no. What ships, scored under heavy gaps (`y23_big2_xn`), is **0.6860**,
+above the 0.6822 that re-chooses the decoder on heavy-gap copies (2 of 7 matches better for the
+re-chosen one). No candidate is kept and production stays `y23_big2`. All four pairing checks passed
+(xn and heavysel choices equal `y23_big2` and `y23_big2_rand`; cuts' no-cut scores equal the base on
+both conditions). Clean tree `ffc1b81`, `~/kora-runs/y26_pass.py`.
+
+| Candidate | Heavy gaps vs `y23_big2_rand` (0.6822) | Normal vs `y23_big2` (0.7665) | Rule |
+|---|---|---|---|
+| `y26_heavysel` | 0.6822 vs xn 0.6860 (−0.0038, 2/7) | 0.7657 (−0.0008, 3/7) | fail |
+| `y26_viscost` | 0.6817 (−0.0006, 1/7) | 0.7666 (+0.0002, 1/7) | fail |
+| `y26_cuts` | 0.6815 (−0.0008, 0/7) | 0.7672 (+0.0007, 2/7) | fail |
+| `y26_visw` | 0.6831 (+0.0009, 5/7) | 0.7642 (−0.0022, 1/7) | pass, then fails the second seed: `y23_big_s2028_rand` 0.6776 → 0.6739 (−0.0037, 4/7) |
+
+Per match (J03WMX, WN1, WOH, WOY, WPY, WQQ, WR9), `y23_big2_xn` 0.653 0.688 0.709 0.675 0.687 0.697
+0.693 against `y23_big2_rand` 0.648 0.676 0.708 0.667 0.688 0.692 0.698. Choosing on heavy-gap inner
+folds raises cost_d but does not score better on held-out heavy-gap matches: with seven matches the
+heavy-gap choice is noisier than the normal one, and the phantom-stoppage effect in the motivation was
+not large enough to show. The honest heavy-gap figure for what ships is 0.6860, not 0.6822;
+`docs/method.md` should cite it. No candidate's heavy-gap score reaches 0.6860, so reading the rule
+against xn instead of `_rand` gives the same answer.
+
 
 **Why (2026-11-08).** The challenge match has the ball missing on 41% of graded frames (CHALLENGE.md);
 the normal evaluation copies have 3.9% (V4) and the heavy-gap copies (`_rand`, the external every-frame
