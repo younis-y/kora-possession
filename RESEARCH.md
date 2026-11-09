@@ -753,6 +753,29 @@ variant sets `eval_rand`, so `kora.train`, `kora.ensemble` and `kora.boundary` m
 choices on the heavy-gap evaluation copies (`train._copies`). Training copies, and so every fitted
 model, are unchanged; nothing in `decode.py` or `boundary.py` changes.
 
+### [pending] Y27: Does moving each team change to the detector's evidence fix boundary timing?
+
+**Why (2026-11-09).** Y26 found nothing in the decoder's dead-ball costs, and the Y13 ceiling puts perfect
+boundary timing at +0.015, the one error type no candidate has targeted directly. The HSMM moves in
+3-frame blocks and the plain decoder places a change where the switch cost is cheapest, not where the
+change detector, which is trained on touches and context, sees it. Expected gain is small (+0.001 to +0.003).
+PFF FC's World Cup data, the other lever considered, is ruled out: its Terms of Use (pff.com/terms, 1.5(i))
+forbid using PFF Data "for machine learning or training of artificial intelligence models".
+
+**Candidate (pre-registered 2026-11-09, before any run).** `y27_snap` (`kora/snap.py`): after decoding, every
+H↔A change moves to the detector's team-change probability within ±r frames, at its peak or its centre of
+mass, r in {3, 6, 12}. Dead-ball changes and half edges never move; windows stop at the midpoint to the
+neighbouring changes, so no run disappears. The setting is chosen on the inner folds' decoded paths with the
+HSMM's rule (inner mean up and at least 5 of 6), otherwise the fold keeps the decoded path. It reuses
+`y23_big2`'s cached stage 1 (only the detectors are refitted, deterministically). Pairing check:
+`spell_f1_nosnap` equals `y23_big2` (and `_rand`) on every fold.
+
+**Decision rule (Y26's, heavy-gap primary).** Kept if `kora.compare y23_big2_rand y27_snap_rand` has the
+mean up and at least 5 of 7 better, `kora.compare y23_big2 y27_snap` loses no more than 0.01, and the same
+change on the second seed raises the heavy-gap mean (`kora.compare y23_big_s2028_rand y27_snap_r_rand`).
+Deploying it needs `kora.run` to apply the snap after decoding; that is written only if it is kept, and only
+after Vladymyr signs off. Otherwise production stays `y23_big2` and the submission is frozen.
+
 ## Vladymyr — error metrics and decoder
 
 ### [verified] V1: Are possessions merged, split, or miscounted?

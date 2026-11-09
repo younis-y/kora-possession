@@ -129,6 +129,12 @@ for _k, _extra in (("viscost", {"decoder": {"vis_factor": [1, 2, 4, 8]}}),
         _extra = {"seq": {**VARIANTS["y23_big_s2028"]["seq"], "weight_missing": 0.5}}
     VARIANTS[f"y26_{_k}_r_rand"] = {**VARIANTS["y23_big_s2028_rand"], **_extra}
 VARIANTS["y26_heavysel_r_xn"] = {**VARIANTS["y23_big_s2028_rand"], "cross": True}   # heavysel's check: _xn -> _rand
+# RESEARCH.md Y27 (pre-registered 2026-11-09): decode-only, on y23_big2's cached stage 1. Every decoded H<->A change
+# moves to the change detector's peak or centre of mass within +-r frames (kora/snap.py), chosen in the inner folds.
+_snap = {"decoder": {"snap": {"r": [3, 6, 12], "mode": ["peak", "mass"]}}}
+VARIANTS["y27_snap"] = {**VARIANTS["y23_big2"], **_snap}
+VARIANTS["y27_snap_rand"] = {**VARIANTS["y23_big2_rand"], **_snap}
+VARIANTS["y27_snap_r_rand"] = {**VARIANTS["y23_big_s2028_rand"], **_snap}   # second-seed check
 PRODUCTION = "y23_big2"     # Y23: y16_seeds + larger temporal network (2 seeds), 7/7 over y16_seeds (was y16_seeds)
 FEATURE_KEYS = ("touch", "mixed", "eval_rand")
 TRAIN_KEYS = ("balance",)
@@ -139,7 +145,7 @@ TRAIN_KEYS = ("balance",)
 # probabilities (kora.nested.fit_refiner, Y7a) instead of stage 1's. cuts: {"theta": [...], "gap": [...]}
 # grid for boundary-cut relabelling (kora/cuts.py, Y10), chosen in the inner folds; None = off.
 DECODER = {"inner_wins": 5, "plain_grid": None, "hsmm_grid": None, "refine": False, "cuts": None, "events": None,
-           "vis_factor": None}
+           "vis_factor": None, "snap": None}
 DETECTOR = {"ha_priority": False}
 
 

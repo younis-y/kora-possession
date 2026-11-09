@@ -37,6 +37,7 @@ from joblib import Parallel, delayed
 from .boundary import GRID, RAW, context, model as detector, runs_of, target
 from . import dwell, engine, events, fill, peaks, seq, visdecode
 from .cuts import relabel
+from .snap import snap
 from . import train as _train
 from .data import cache_dir
 from .decode import decode, decode_hsmm, log_duration
@@ -259,6 +260,10 @@ def cut_scores(paths, P, C, y, half, theta, gap):
     return [scores(y[k], relabel(paths[k], P[k], C[k], half[k], theta, gap), half[k])["mean_f1"] for k in paths]
 
 
+def snap_scores(paths, C, y, half, r, mode):
+    return [scores(y[k], snap(paths[k], C[k], half[k], r, mode), half[k])["mean_f1"] for k in paths]
+
+
 def screen(outer, y, half, labels, P0=None):
     """Y20 screen: kora.train's plain-decoder pick (best mean over the seven outer folds, so leaky like
     kora.train) for this variant and for its base, mixed or mixed_rand, from the base's cached outer folds on
@@ -333,7 +338,7 @@ def main():
                 print(f"stage 1 without {m}, {k} ({time.time() - t0:.0f} s)", flush=True)
     cross = None
     if CONFIG.get("cross"):            # Y26: detector, prior and decoder chosen on the other gap condition's inner folds
-        if args.screen or CONFIG.get("tta") or DECODER["refine"] or DECODER["cuts"] or DECODER["events"] or DECODER["vis_factor"] \
+        if args.screen or CONFIG.get("tta") or DECODER["refine"] or DECODER["cuts"] or DECODER["events"] or DECODER["snap"] or DECODER["vis_factor"] \
                 or "weight_missing" in CONFIG.get("seq", {}):
             raise SystemExit("cross is registered on the plain and HSMM decoders only")
         fv_o, X_o = eval_copies(not CONFIG.get("eval_rand"))
@@ -425,7 +430,7 @@ def main():
         pred_hsmm = decode_hsmm(outer[m], change[m, m], seg, prior, ld, *HSMM[bh][:4], rate, *HSMM[bh][4:])
         pred = pred_hsmm if keep else pred_plain
         s_nocut, cut = scores(y[m], pred, half[m]), {"theta": None, "gap": None}
-        if DECODER["cuts"] or DECODER["events"]:
+        if DECODER["cuts"] or DECODER["events"] or DECODER["snap"]:
             paths = (hsmm_paths(P, C, yi, hi, prior, rate, HSMM[bh]) if keep else
                      {k: plain_path(P[k], half[k], prior, PLAIN[bp], miss and miss[k]) for k in ins})
             off = np.array([scores(y[k], paths[k], half[k])["mean_f1"] for k in ins])
@@ -447,6 +452,15 @@ def main():
             if es[be].mean() > off.mean() and (es[be] > off).sum() >= INNER_WINS:   # same rule as the HSMM
                 evsel.update(theta=grid[be][0], max_len=grid[be][1])
                 pred = events.relabel(pred, E[m, m], half[m], *grid[be])
+        s_nosnap, snapsel = scores(y[m], pred, half[m]), {"r": None, "mode": None}
+        if DECODER["snap"]:                                            # Y27: move H<->A changes to the detector (kora/snap.py)
+            grid = [(r, md) for r in DECODER["snap"]["r"] for md in DECODER["snap"]["mode"]]
+            ss = np.array(Parallel(n_jobs=-1)(delayed(snap_scores)(paths, C, yi, hi, r, md) for r, md in grid))
+            bs = int(ss.mean(1).argmax())
+            snapsel.update(inner_mean=float(ss[bs].mean()), inner_mean_off=float(off.mean()))
+            if ss[bs].mean() > off.mean() and (ss[bs] > off).sum() >= INNER_WINS:   # same rule as the HSMM
+                snapsel.update(r=grid[bs][0], mode=grid[bs][1])
+                pred = snap(pred, change[m, m], half[m], *grid[bs])
         s, s_plain, s_hsmm = scores(y[m], pred, half[m]), scores(y[m], pred_plain, half[m]), scores(y[m], pred_hsmm, half[m])
         folds[m] = {
             "inner_matches": ins, "decoder": "hsmm" if keep else "plain",
@@ -459,6 +473,7 @@ def main():
             "spell_f1_plain": s_plain["mean_f1"], "spell_f1_hsmm": s_hsmm["mean_f1"],
             "spell_f1_nocut": s_nocut["mean_f1"], "cuts": cut,
             "spell_f1_noevent": s_noevent["mean_f1"], "events": evsel,
+            "spell_f1_nosnap": s_nosnap["mean_f1"], "snap": snapsel,
         }
         bundle.update({f"{m}__y_true": y[m].astype(np.int8), f"{m}__y_pred": pred.astype(np.int8),
                        f"{m}__half": half[m], f"{m}__ball_seen": seen[m], f"{m}__frame": np.arange(len(pred))})
