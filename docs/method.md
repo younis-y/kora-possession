@@ -40,6 +40,7 @@ least 5 of the 7 matches improve.
 | other tree settings: LightGBM at the same settings, feature bagging, deeper trees, 1000 trees | not used | screened against the single-seed base (0.7516): 0.7488, 0.7521 (3/7), deeper stopped for compute. 1000 trees passed as a three-seed ensemble (0.7595 vs 0.7566, 5/7) but gained less than the temporal network; combining the two was pre-registered but not run (`RESEARCH.md` Y20, Y24) |
 | a smaller temporal network from one seed | dropped | 0.7673 (+0.0107, 7/7) with seed 2027 but 0.7577 (+0.0011, 4/7) with seed 2028: most of the gain was one seed's luck (`RESEARCH.md` Y22) |
 | SkillCorner possession events as labels (20 more test matches) | dropped by a pre-registered gate | labels derived from its player-possession events are coarser than the possession scored here: 136 possessions per 45 minutes against IDSSE's 206, median 5.7 s against 3.8 s. As a test set they would reward missing short possessions (`RESEARCH.md` Y19) |
+| heavy-gap decoder choice, dearer dead-ball switch where the ball is missing, cuts, more network weight where the ball is missing, snapping team changes to the detector | dropped | decode-only, judged on heavy-gap copies first: 0.6822, 0.6817, 0.6815, 0.6831 (5/7, then −0.0037 on a second seed), 0.6829 (1/7), against 0.6860 for what ships (`RESEARCH.md` Y26, Y27) |
 
 ## 3. Training data (all from other games)
 
@@ -176,7 +177,8 @@ label-free random ball gaps at 40% (section 4); since J6 a candidate may not los
 there. The network was kept only after its second seed passed too: one larger network scored +0.0103
 (seed 2027) and +0.0069 (seed 2028) against Y16, and the submission averages the two. With the plain
 decoder on every fold it scores 0.7638 (heavy gaps 0.6809), and with the semi-Markov decoder on
-every fold, as submitted, 0.7681 (heavy gaps 0.6836). Recall of true
+every fold, as submitted, 0.7681 (heavy gaps 0.6836). The heavy-gap column re-chooses the decoder on heavy-gap copies; what ships, with its
+decoder chosen on normal copies, scores 0.6860 under heavy gaps (`RESEARCH.md` Y26). Recall of true
 possessions under 1 s rose from 0.21 (B0) to 0.32, and for 1-2 s from 0.44 to 0.57; spellF1 at IoU
 0.3 / 0.5 / 0.7 is 0.840 / 0.776 / 0.677 (Y16: 0.833 / 0.765 / 0.668).
 
