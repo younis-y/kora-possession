@@ -30,13 +30,14 @@ least 5 of the 7 matches improve.
 | SkillCorner open data | **used** | measurements of how automatic tracking loses the ball and players (section 4); no labels used |
 | Metrica sample data | dropped | two matched comparisons gave +0.54 and −0.61 points of gap-frame accuracy, and the data has no standard licence |
 | player-only model fused in ball gaps | dropped | the main model was already as accurate inside gaps (85.8% vs 84.4% team accuracy) |
+| PathCRF (players-only event detection) | considered, not run | requires adapting its supervision to our team-possession task; the team judged seven-fold training infeasible before the deadline (`RESEARCH.md` V10) |
 | wider decoder grid, boundary bonus on team changes only | dropped | on B0: 0.7143 and 0.7146 vs 0.7147 (better on 0/7 and 1/7 matches). The wider grid chose B0's settings in 6 of 7 folds and the bonus change altered 51 frames, and neither candidate passed the registered keep rule on B0 (`RESEARCH.md` V5, V6) |
 | separate costs for entering and leaving dead ball | dropped before testing | stoppages and restarts alternate within a half: with the total cost, endpoint states and same-state continuation penalties fixed, changing the split between the two cannot change the preferred internal boundaries (`RESEARCH.md` V6) |
 | stage-2 refiner, wider decoder grid, dwell features, full possession balancing | dropped | on R2 (0.7528): 0.7415 (0/7), 0.7547 (3/7), 0.7492 (3/7), 0.7500 (2/7) (`RESEARCH.md` Y7, Y8) |
-| priority for team-change detector targets | dropped | 0.7574 on R2 but 4/7 with two ties; again on the mixed model 0.7528 vs 0.7511, 3/7 (`RESEARCH.md` V7) |
+| priority for team-change detector targets | dropped | 0.7574 on R2 but 4/7 with two ties; a second round on the mixed model was registered but not run (`RESEARCH.md` V7) |
 | cuts at detector peaks, mirror averaging, weak-touch peaks | dropped | on the mixed model (0.7511): 0.7549 (4/7), 0.7553 (4/7), 0.7497 (3/7) (`RESEARCH.md` Y10-Y12) |
 | touch-event model relabelling short spells | dropped | its gate passed (it finds 80 of 470 swallowed possessions where the detector finds 62), but relabelling scored 0.7521 vs 0.7511, 1/7 (`RESEARCH.md` Y13, Y14) |
-| filling short ball gaps | dropped | 0.7576 vs 0.7511 (4/7) alone; 0.7582 vs 0.7566 (3/7) on the submitted ensemble, so most of its gain was seed noise (`RESEARCH.md` Y15, Y18) |
+| filling short ball gaps | dropped | 0.7576 vs 0.7511 (4/7) alone; 0.7582 vs 0.7566 (3/7) on the three-seed tree ensemble (Y16), so most of its gain was seed noise (`RESEARCH.md` Y15, Y18) |
 | other tree settings: LightGBM at the same settings, feature bagging, deeper trees, 1000 trees | not used | screened against the single-seed base (0.7516): 0.7488, 0.7521 (3/7), deeper stopped for compute. 1000 trees passed as a three-seed ensemble (0.7595 vs 0.7566, 5/7) but gained less than the temporal network; combining the two was pre-registered but not run (`RESEARCH.md` Y20, Y24) |
 | a smaller temporal network from one seed | dropped | 0.7673 (+0.0107, 7/7) with seed 2027 but 0.7577 (+0.0011, 4/7) with seed 2028: most of the gain was one seed's luck (`RESEARCH.md` Y22) |
 | SkillCorner possession events as labels (20 more test matches) | dropped by a pre-registered gate | labels derived from its player-possession events are coarser than the possession scored here: 136 possessions per 45 minutes against IDSSE's 206, median 5.7 s against 3.8 s. As a test set they would reward missing short possessions (`RESEARCH.md` Y19) |
@@ -192,8 +193,8 @@ possessions under 1 s rose from 0.21 (B0) to 0.32, and for 1-2 s from 0.44 to 0.
   team on at least half their frames in only 16% of them: its evidence there is no stronger than its
   noise. That is why decoder changes moved the score by less than 0.005 (section 2).
 - **Seed noise is as large as most changes.** One seed alone moves held-out spellF1 by up to ~0.018,
-  so a single-seed comparison can pass or fail the 5-of-7 rule by chance. The submitted three-seed
-  average reduces this for later comparisons: the short ball-gap fill, +0.0065 on one seed, shrank
+  so a single-seed comparison can pass or fail the 5-of-7 rule by chance. The three-seed tree
+  average (Y16) reduces this for later comparisons: the short ball-gap fill, +0.0065 on one seed, shrank
   to +0.0016 on the average (`RESEARCH.md` Y15, Y18). The network showed the same: a small network's
   +0.0107 on one seed was +0.0011 on another (Y22), so the submitted network is a two-seed average
   whose seeds each passed on their own.
@@ -206,13 +207,14 @@ possessions under 1 s rose from 0.21 (B0) to 0.32, and for 1-2 s from 0.44 to 0.
   frames. Every candidate since J6 is therefore also scored on heavy-gap copies (40% missing at
   random, section 8). Degrading the whole evaluation copy, players included, at full SkillCorner
   broadcast severity scores 0.630 for the mixed model (`RESEARCH.md` V8, report only).
-- **Where the errors are (R2, `RESEARCH.md` V1–V4).** R2 predicts 13.5% too few possessions. Of
-  the 891 true possessions missed at IoU 0.5, 426 (48%) are covered on at least half their frames by
-  opposite-team predictions, most of them shorter than 2 s, 411 (46%) by same-team predictions
-  despite failing IoU matching, and 51 (6%) have a wrong-team prediction with IoU ≥ 0.5. These are ordered
-  diagnostic categories, not established causes. Team changes are recovered less often than restarts
-  (recall 0.62 against 0.97 within 1 s), and 190 of the 195 missed stoppages have a predicted
-  stoppage within 1 s with the wrong team just before it.
+- **Where the errors are (the submitted `y23_big2`, `RESEARCH.md` V1–V4, V9).** It predicts 11.5% too
+  few possessions (2,710 against 3,061). Of the 826 true possessions missed at IoU 0.5, 382 (46%) are
+  covered on at least half their frames by opposite-team predictions, most of them shorter than 2 s,
+  392 (47%) by same-team predictions despite failing IoU matching, 48 (6%) have a wrong-team prediction
+  with IoU ≥ 0.5, and 4 are covered by dead ball. These are ordered diagnostic categories, not
+  established causes. Team changes are recovered less often than restarts (recall 0.65 against 0.96
+  within 1 s), and 165 of the 171 missed stoppages have a predicted stoppage within 1 s with the wrong
+  team just before it.
 - **Boundary targets.** The change detector's training targets mark ±5 frames around each change,
   and live/dead targets overwrite overlapping team-change target frames. A label audit found this
   partly affects 41 of 2,351 team-change windows (1.7%), mostly just before stoppages, and erases
