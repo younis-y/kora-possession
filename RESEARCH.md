@@ -753,7 +753,15 @@ variant sets `eval_rand`, so `kora.train`, `kora.ensemble` and `kora.boundary` m
 choices on the heavy-gap evaluation copies (`train._copies`). Training copies, and so every fitted
 model, are unchanged; nothing in `decode.py` or `boundary.py` changes.
 
-### [pending] Y27: Does moving each team change to the detector's evidence fix boundary timing?
+### [dropped] Y27: Does moving each team change to the detector's evidence fix boundary timing?
+
+**Outcome (2026-11-09):** no. Heavy gaps 0.6822 → 0.6829 (+0.0006, 1/7), normal copies 0.7665 → 0.7657
+(−0.0008, 0/7): fail, so the second seed was not run. The inner rule kept the snap in one fold per
+condition (r 12, centre of mass) and declined it in the other six; in the normal fold where it was kept it
+lost. Pairing checks passed (`spell_f1_nosnap` equals `y23_big2` and `y23_big2_rand` on every fold). Clean
+tree `6d6ab9c`, `~/kora-runs/y27_pass.py`. The detector's evidence does not place changes better than the
+decoders already do. Production stays `y23_big2`, and with Y24-Y27 all failing, it is the submission.
+
 
 **Why (2026-11-09).** Y26 found nothing in the decoder's dead-ball costs, and the Y13 ceiling puts perfect
 boundary timing at +0.015, the one error type no candidate has targeted directly. The HSMM moves in
