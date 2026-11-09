@@ -17,7 +17,9 @@ Every change was scored the same way before it was kept: nested leave-one-match-
 over the seven training matches, scored with the challenge's own `possession_metrics.py` (spellF1,
 vendored under its MIT licence), compared match by match with the current baseline. The decision
 rule was written in `RESEARCH.md` before each run: keep a change only if mean spellF1 rises and at
-least 5 of the 7 matches improve.
+least 5 of the 7 matches improve. Two rounds used a registered variant of it: mixed training (J6) was
+kept for its heavy-gap gain (+0.0881, 7/7) at a cost of 0.0017 on normal copies, and the last decoding
+round (Y26, Y27) was judged on heavy-gap copies first.
 
 ## 2. Assets: used and dropped
 
@@ -38,9 +40,10 @@ least 5 of the 7 matches improve.
 | cuts at detector peaks, mirror averaging, weak-touch peaks | dropped | on the mixed model (0.7511): 0.7549 (4/7), 0.7553 (4/7), 0.7497 (3/7) (`RESEARCH.md` Y10-Y12) |
 | touch-event model relabelling short spells | dropped | its gate passed (it finds 80 of 470 swallowed possessions where the detector finds 62), but relabelling scored 0.7521 vs 0.7511, 1/7 (`RESEARCH.md` Y13, Y14) |
 | filling short ball gaps | dropped | 0.7576 vs 0.7511 (4/7) alone; 0.7582 vs 0.7566 (3/7) on the three-seed tree ensemble (Y16), so most of its gain was seed noise (`RESEARCH.md` Y15, Y18) |
-| other tree settings: LightGBM at the same settings, feature bagging, deeper trees, 1000 trees | not used | screened against the single-seed base (0.7516): 0.7488, 0.7521 (3/7), deeper stopped for compute. 1000 trees passed as a three-seed ensemble (0.7595 vs 0.7566, 5/7) but gained less than the temporal network; combining the two was pre-registered but not run (`RESEARCH.md` Y20, Y24) |
+| other tree settings: LightGBM at the same settings, feature bagging, deeper trees, 1000 trees | not used | screened against the single-seed base (0.7516): 0.7488, 0.7521 (3/7), deeper stopped for compute. 1000 trees passed as a three-seed ensemble (0.7595 vs 0.7566, 5/7) but gained less than the temporal network; combined with the network they scored 0.7634 against 0.7665 (3/7), so the combination was dropped (`RESEARCH.md` Y20, Y24) |
 | a smaller temporal network from one seed | dropped | 0.7673 (+0.0107, 7/7) with seed 2027 but 0.7577 (+0.0011, 4/7) with seed 2028: most of the gain was one seed's luck (`RESEARCH.md` Y22) |
 | SkillCorner possession events as labels (20 more test matches) | dropped by a pre-registered gate | labels derived from its player-possession events are coarser than the possession scored here: 136 possessions per 45 minutes against IDSSE's 206, median 5.7 s against 3.8 s. As a test set they would reward missing short possessions (`RESEARCH.md` Y19) |
+| heavy-gap decoder choice, dearer dead-ball switch where the ball is missing, cuts, more network weight where the ball is missing, snapping team changes to the detector | dropped | decode-only, judged on heavy-gap copies first: 0.6822, 0.6817, 0.6815, 0.6831 (5/7, then −0.0037 on a second seed), 0.6829 (1/7), against 0.6860 for what ships (`RESEARCH.md` Y26, Y27) |
 
 ## 3. Training data (all from other games)
 
@@ -86,7 +89,7 @@ estimate the ball goes missing mostly during stoppages, so a model can learn "ba
 ball". Half the training copies (the odd ones) therefore lose the ball at random instead: gaps with
 SkillCorner's every-frame lengths, placed uniformly in each half without looking at the labels, until
 SkillCorner's every-frame missing share (40%) is spent. A second set of evaluation copies masked the
-same way (the "heavy-gap" copies) is scored for every candidate since. Under heavy gaps a model
+same way (the "heavy-gap" copies) is scored for most candidates since. Under heavy gaps a model
 trained without this loses 0.180 spellF1 (0.7528 to 0.5726); mixed training recovers about half of it
 on every match (0.6607, 7/7) at a cost of 0.0017 on the normal copies.
 
@@ -166,7 +169,7 @@ they are learned tendencies, not hard constraints:
 |---|---:|---:|---|
 | B0: compliant baseline | 0.7147 ± 0.0234 | | |
 | R1: + touch features | 0.7432 ± 0.0325 | | +0.0284, 6/7 better |
-| R2: + balanced weights | 0.7528 ± 0.0279 | 0.5726 | +0.0096, 6/7 |
+| R2: + balanced weights | 0.7528 ± 0.0279 | 0.5726 | +0.0097, 6/7 |
 | J6: + mixed training | 0.7511 ± 0.0270 | 0.6607 | −0.0017; heavy gaps +0.0881, 7/7 |
 | Y16: + three seed members (submitted 6 Nov) | 0.7566 ± 0.0300 | 0.6783 | +0.0055, 5/7; heavy gaps +0.0176, 6/7 |
 | **Y23: + temporal network, two seeds (submitted)** | **0.7665 ± 0.0293** | **0.6822** | **+0.0099, 7/7; heavy gaps +0.0039, 4/7** |
@@ -176,8 +179,11 @@ selection, and scored once. "Heavy ball gaps" scores the same models on evaluati
 label-free random ball gaps at 40% (section 4); since J6 a candidate may not lose more than 0.01
 there. The network was kept only after its second seed passed too: one larger network scored +0.0103
 (seed 2027) and +0.0069 (seed 2028) against Y16, and the submission averages the two. With the plain
-decoder on every fold it scores 0.7638 (heavy gaps 0.6809), and with the semi-Markov decoder on
-every fold, as submitted, 0.7681 (heavy gaps 0.6836). Recall of true
+decoder on every fold it scores 0.7638, and with the semi-Markov decoder on
+every fold, as submitted, 0.7681. The heavy-gap column re-chooses the decoder and its costs on
+heavy-gap copies (0.6809 plain, 0.6836 semi-Markov). Keeping the choices made on normal copies, as the
+build does, scores higher under heavy gaps: 0.6860 with each fold's own choice and 0.6873 with the
+semi-Markov decoder on every fold, as submitted (`RESEARCH.md` Y26). Recall of true
 possessions under 1 s rose from 0.21 (B0) to 0.32, and for 1-2 s from 0.44 to 0.57; spellF1 at IoU
 0.3 / 0.5 / 0.7 is 0.840 / 0.776 / 0.677 (Y16: 0.833 / 0.765 / 0.668).
 
@@ -201,8 +207,8 @@ possessions under 1 s rose from 0.21 (B0) to 0.32, and for 1-2 s from 0.44 to 0.
   the submission from the committed models on any machine. A from-scratch `build.sh` elsewhere refits
   it, which is much slower without a GPU and may not match the committed hash bit for bit.
 - **The validation sees few ball gaps.** Normal evaluation copies are degraded with the camera-on
-  estimate (about 6% of the ball missing), while the challenge ball is missing on 41% of graded
-  frames. Every candidate since J6 is therefore also scored on heavy-gap copies (40% missing at
+  estimate (3.9% of the ball missing, `RESEARCH.md` V4), while the challenge ball is missing on 41% of graded
+  frames. Most candidates since J6 are therefore also scored on heavy-gap copies (40% missing at
   random, section 8). Degrading the whole evaluation copy, players included, at full SkillCorner
   broadcast severity scores 0.630 for the mixed model (`RESEARCH.md` V8, report only).
 - **Where the errors are (the submitted `y23_big2`, `RESEARCH.md` V1–V4, V9).** It predicts 11.5% too
@@ -222,14 +228,17 @@ possessions under 1 s rose from 0.21 (B0) to 0.32, and for 1-2 s from 0.44 to 0.
 - **Seven training matches, one league.** All labels are German top-two-division matches; the
   challenge match may differ in style and camera.
 - **With more time:** a video ball detector for the gaps (gated on licensed weights and external
-  calibration), the stronger tree settings combined with the network (`RESEARCH.md` Y24, pre-registered),
-  and more labelled open matches.
+  calibration) and more labelled open matches. The largest open set we found, PFF FC's 2022 World Cup
+  data, is excluded: its Terms of Use forbid training machine-learning models on it. Decoding changes
+  are exhausted: the last round (choosing the decoder on heavy-gap copies, dearer dead-ball switches
+  where the ball is missing, snapping changes to the detector) found nothing (`RESEARCH.md` Y26, Y27).
 
 ## 10. Reproduction
 
 ```bash
 ./build.sh                                     # venv, download, train, decode, check; fails on a hash mismatch
 .venv/bin/python -m kora.run --out "Kora Analytics.csv"   # submission from the committed models
+shasum -a 256 -c models/submission.sha256                 # must print OK: the same file we submitted
 .venv/bin/python -m kora.nested --variant mixed           # single-seed base (about 1-2 h; folds are cached)
 .venv/bin/python -m kora.nested --variant y16_seeds       # the three-member tree ensemble (Y16)
 .venv/bin/python -m kora.nested --variant y23_big2        # the submitted model: Y16 + the network (GPU if present)
@@ -255,7 +264,9 @@ Match data is gated and never committed; `data/` and every derived array are git
   clarification, raw rows of the provided tracking files and one frame of the broadcast video were
   displayed to Claude while inspecting the data formats. Since 3 November both assistants have worked
   only on code and on external-data results; challenge-side checks are run and read by a team member, and for our own
-  submission file they read only the validator verdict, row count and hash.
+  submission file they read only the validator verdict, row count and hash. One exception: on 9 November
+  Claude displayed the first 20 rows of our own submission file (all X, before kick-off) while looking
+  for registration instructions; no score or ground truth was involved.
 - **Challenge data is read only for inference and automatic checks** (`kora/run.py`, `kora/checks.py`;
   `kora/profile.py` and `kora/shift.py` are diagnostics). A unit test (`tests/test_compliance.py`)
   fails if any other module imports the challenge loaders.
