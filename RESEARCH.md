@@ -704,7 +704,8 @@ Per match (J03WMX, WN1, WOH, WOY, WPY, WQQ, WR9), `y23_big2_xn` 0.653 0.688 0.70
 0.693 against `y23_big2_rand` 0.648 0.676 0.708 0.667 0.688 0.692 0.698. Choosing on heavy-gap inner
 folds raises cost_d but does not score better on held-out heavy-gap matches: with seven matches the
 heavy-gap choice is noisier than the normal one, and the phantom-stoppage effect in the motivation was
-not large enough to show. The honest heavy-gap figure for what ships is 0.6860, not 0.6822;
+not large enough to show. The honest heavy-gap figure for what ships is 0.6860, not 0.6822 (0.6873 with the semi-Markov
+decoder on every fold, as the build applies it, against 0.6836 re-chosen);
 `docs/method.md` should cite it. No candidate's heavy-gap score reaches 0.6860, so reading the rule
 against xn instead of `_rand` gives the same answer.
 
