@@ -1294,6 +1294,10 @@ bootstrap −0.0039 to +0.0118. Recall under 1 s at IoU 0.5 rises from 75 to 87 
 from 210 to 217 of 535, but invented possessions rise from 590 to 625. Under these random gaps, the
 missed possessions under 1 s have 43.0% of their frames without the ball (1,659 of 3,855) against 0.9%
 for the found ones (14 of 1,491); on normal copies the shares are 0.5% and 1.4%.
+These heavy-gap diagnostics use `y23_big2_rand` (0.6822), whose decoder type and settings are selected
+on heavy-gap inner folds. Y26 reports 0.6873 for the evaluation matching the build's decoding policy:
+choices made on normal copies, with semi-Markov decoding on every fold. No prediction bundle for that
+evaluation was compared here.
 
 On normal copies `y23_big2` has fewer split components (62 → 54) and more merge components (169 → 180).
 Its higher score accompanies fewer invented possessions and fewer missed possessions lasting at least
