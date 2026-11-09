@@ -785,6 +785,44 @@ change on the second seed raises the heavy-gap mean (`kora.compare y23_big_s2028
 Deploying it needs `kora.run` to apply the snap after decoding; that is written only if it is kept, and only
 after Vladymyr signs off. Otherwise production stays `y23_big2` and the submission is frozen.
 
+### [pending] Y28: Do synthetic Google Research Football games help as extra stage-1 training data?
+
+**Why (2026-11-09).** Every candidate since Y23 has worked on the same seven labelled matches, and the open
+alternatives are spent: SkillCorner's labels are too coarse (Y19; its phases of play, merged into team
+possessions, are coarser still: 127 per 45 minutes, median 7.3 s), Metrica has no licence (J4), PFF forbids
+training (Y27). Radke and Tilbury (AAMAS 2025, github.com/Dtradke/grf_tracking_data) release 3,000 simulated
+Google Research Football games with all 22 players and the ball on every step and an exact per-player
+on-ball flag. The repository names no licence; the owner chose to use it (9 Nov). The organisers allow
+external data about other games that they can access and the write-up explains (RULES.md); the files are a
+public download.
+
+**Data (`kora/grf.py`, commit `fe823ab` of that repository).** The first 150 games (50 files, 3 per file),
+each 3,000 steps at 10 Hz (5 minutes of play), interpolated to 25 fps; x × 52.5 and y × 34 / 0.42 in metres
+from the centre spot; one section per game. Labels: the team of the last player on the ball; D from the
+ball leaving the pitch, or entering a goal, until the next touch on the pitch, and before the kick-off
+touch. GRF has few stoppages (D about 2-5% of frames on games 0 and 11), so D is learnt from IDSSE.
+Each game gets IDSSE's training copies (degraded with the same external parameters, odd copies with
+label-free gaps as `mixed`, each mirrored); stage 1 sees every 12th frame of them, about 375,000 rows,
+two thirds of a six-match fold's IDSSE rows. Only the stage-1 trees see GRF; evaluation, the detector, the
+decoders and the temporal network are unchanged and see IDSSE only.
+
+**Candidates (pre-registered 2026-11-09, before any fit).** `y28_grf` = `mixed` + GRF; its `_rand` twin is
+the same fits scored on the heavy-gap evaluation copies (cached by the same run). Nothing else is tried in
+this round: no other game count, stride or weighting.
+
+**Decision rule (heavy gaps primary, as Y26).**
+1. Screen, `kora.nested --variant y28_grf --screen` (the seven outer fits), then `y28_grf_rand --screen`
+   (cached), each against `mixed` / `mixed_rand`'s cached outer folds as Y20 scores them. Goes on if either
+   delta is at least +0.002 and neither is below -0.005.
+2. Stage A, full nested: `kora.compare mixed_rand y28_grf_rand` mean up and at least 5 of 7 better, and
+   `kora.compare mixed y28_grf` not lower by more than 0.01.
+3. Stage B, on production: `y28_prod` = `y23_big2` with GRF in all three tree members (the networks keep
+   their cached fits): `kora.compare y23_big2_rand y28_prod_rand` mean up and at least 5 of 7, and
+   `kora.compare y23_big2 y28_prod` not lower by more than 0.01. Stage B variants are added only if
+   Stage A passes.
+Production changes only if Stage A and Stage B both pass, the build is extended to fit with GRF, and the
+team agrees to resubmit; otherwise `y23_big2` stays the submission.
+
 ## Vladymyr — error metrics and decoder
 
 ### [verified] V1: Are possessions merged, split, or miscounted?

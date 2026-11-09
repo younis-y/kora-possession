@@ -135,6 +135,11 @@ _snap = {"decoder": {"snap": {"r": [3, 6, 12], "mode": ["peak", "mass"]}}}
 VARIANTS["y27_snap"] = {**VARIANTS["y23_big2"], **_snap}
 VARIANTS["y27_snap_rand"] = {**VARIANTS["y23_big2_rand"], **_snap}
 VARIANTS["y27_snap_r_rand"] = {**VARIANTS["y23_big_s2028_rand"], **_snap}   # second-seed check
+# RESEARCH.md Y28 (pre-registered 2026-11-09): mixed + 150 synthetic Google Research Football games in every stage-1
+# fit (kora/grf.py), every 12th frame of their training copies. The trees' _rand twin is cached by the same fits.
+GRF = {"games": 150, "stride": 12}
+VARIANTS["y28_grf"] = {**VARIANTS["mixed"], "grf": GRF}
+VARIANTS["y28_grf_rand"] = {**VARIANTS["mixed_rand"], "grf": GRF}
 PRODUCTION = "y23_big2"     # Y23: y16_seeds + larger temporal network (2 seeds), 7/7 over y16_seeds (was y16_seeds)
 FEATURE_KEYS = ("touch", "mixed", "eval_rand")
 TRAIN_KEYS = ("balance",)
@@ -204,6 +209,8 @@ def stage1_version(config=CONFIG):
             parts.append((ROOT / "kora" / f"{key}.py").read_bytes())
     if config.get("clf"):              # Y20, same
         parts += [(ROOT / "kora" / "engine.py").read_bytes(), json.dumps(config["clf"], sort_keys=True)]
+    if config.get("grf"):              # Y28, same
+        parts += [(ROOT / "kora" / "grf.py").read_bytes(), json.dumps(config["grf"], sort_keys=True)]
     return feature_version(config) + "s" + _hash(parts)
 
 
