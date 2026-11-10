@@ -140,6 +140,13 @@ VARIANTS["y27_snap_r_rand"] = {**VARIANTS["y23_big_s2028_rand"], **_snap}   # se
 GRF = {"games": 150, "stride": 12}
 VARIANTS["y28_grf"] = {**VARIANTS["mixed"], "grf": GRF}
 VARIANTS["y28_grf_rand"] = {**VARIANTS["mixed_rand"], "grf": GRF}
+MIX = {"y29_x4": {"extra": ["cam", "rand"]},                # Y29: 4 copies, half with random ball gaps
+       "y29_r34": {"extra": ["rand", "rand"]},              # 4 copies, three quarters
+       "y29_r1": {"drop_cam": True, "extra": ["rand"]}}     # 2 copies, all
+for _n, _m in MIX.items():
+    VARIANTS[_n] = {**VARIANTS["mixed"], "mix": _m}
+    VARIANTS[f"{_n}_rand"] = {**VARIANTS["mixed_rand"], "mix": _m}
+del _n, _m
 PRODUCTION = "y23_big2"     # Y23: y16_seeds + larger temporal network (2 seeds), 7/7 over y16_seeds (was y16_seeds)
 FEATURE_KEYS = ("touch", "mixed", "eval_rand")
 TRAIN_KEYS = ("balance",)
@@ -211,6 +218,8 @@ def stage1_version(config=CONFIG):
         parts += [(ROOT / "kora" / "engine.py").read_bytes(), json.dumps(config["clf"], sort_keys=True)]
     if config.get("grf"):              # Y28, same
         parts += [(ROOT / "kora" / "grf.py").read_bytes(), json.dumps(config["grf"], sort_keys=True)]
+    if config.get("mix"):              # Y29, same
+        parts += [(ROOT / "kora" / "mix.py").read_bytes(), json.dumps(config["mix"], sort_keys=True)]
     return feature_version(config) + "s" + _hash(parts)
 
 

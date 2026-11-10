@@ -831,6 +831,42 @@ this round: no other game count, stride or weighting.
 Production changes only if Stage A and Stage B both pass, the build is extended to fit with GRF, and the
 team agrees to resubmit; otherwise `y23_big2` stays the submission.
 
+### [pending] Y29: Do more training copies, or more of them with random ball gaps, help under heavy gaps?
+
+**Why (2026-11-10).** The challenge match has the ball missing on 41% of graded frames, which is the
+heavy-gap condition, and that is where we are weakest (0.6873 for what ships against 0.7665 on normal
+copies). The one change aimed at it, mixed training (J6), gave +0.0881 under heavy gaps on 7 of 7, and its
+two settings were never tuned: each match gets 2 degraded copies (`TRAIN_COPIES`), each mirrored, and 1 of
+the 2 loses the ball at random. Everything since has been decoding or extra data (Y24-Y28).
+
+**Candidates (pre-registered 2026-11-10, before any fit; `kora/mix.py`).** Each is `mixed` with its cached
+copies kept and extra copies drawn with their own generators (seeds `[2027, match, 500 + j]` for the
+degradation, `[2027, match, 600 + j]` for the random gaps), so the evaluation copies, both normal and
+heavy-gap, are exactly `mixed`'s:
+- `y29_x4`: 4 copies, half with random gaps (one extra camera-on copy, one extra random one);
+- `y29_r34`: 4 copies, three quarters with random gaps (two extra random copies);
+- `y29_r1`: 2 copies, both with random gaps (copy 0 dropped, one extra random copy).
+`y29_x4` against `y29_r34` separates the share from the count. Each `_rand` twin is the same fits scored on
+the heavy-gap copies (cached by the same run). Nothing else is tried in this round.
+
+**Caveat.** The heavy-gap copies use the same random-gap generator as the random training copies, so more
+of those copies favours the heavy-gap score almost by construction. The normal-copy limits below guard
+against a model that only learns the simulation; the challenge's own ball loss is somewhere between the two.
+
+**Decision rule (heavy gaps primary, as Y26).**
+1. Screen, `kora.nested --variant <v> --screen` then `<v>_rand --screen`, against `mixed` / `mixed_rand`'s
+   cached outer folds as Y20 scores them. A candidate goes on if its heavy-gap delta is at least +0.002 and
+   its normal delta is not below -0.005. If several do, only the one with the largest heavy-gap delta goes on.
+2. Stage A, full nested: `kora.compare mixed_rand <v>_rand` mean up and at least 5 of 7 better, and
+   `kora.compare mixed <v>` not lower by more than 0.01.
+3. Stage B, on production: `y29_prod` = `y23_big2` with the same copies in all three tree members (the
+   networks keep their cached fits): `kora.compare y23_big2_rand y29_prod_rand` mean up and at least 5 of 7,
+   and `kora.compare y23_big2 y29_prod` not lower by more than 0.01. Stage B variants are added only if
+   Stage A passes.
+Production changes only if Stage A and Stage B both pass, the build is extended to fit with these copies,
+the team agrees to unfreeze, and the rebuilt file passes the validator and `kora.checks` on Linux;
+otherwise `y23_big2` stays the submission.
+
 ## Vladymyr — error metrics and decoder
 
 ### [verified] V1: Are possessions merged, split, or miscounted?

@@ -35,7 +35,7 @@ import numpy as np
 from joblib import Parallel, delayed
 
 from .boundary import GRID, RAW, context, model as detector, runs_of, target
-from . import dwell, engine, events, fill, grf, peaks, seq, visdecode
+from . import dwell, engine, events, fill, grf, mix, peaks, seq, visdecode
 from .cuts import relabel
 from .snap import snap
 from . import train as _train
@@ -193,7 +193,7 @@ def seq_stage1(data, evs, cfg, pairs=True):
     the settings and the seed, so a _rand twin reuses the fits. The tree classifier ("clf", Y20) is left out
     of the key: it does not change the training copies the network sees (Y24 reuses Y23's fits)."""
     from pathlib import Path
-    key = stage1_version({k: v for k, v in eval_config(False).items() if k not in ("clf", "grf")}) + "q" + _hash(
+    key = stage1_version({k: v for k, v in eval_config(False).items() if k not in ("clf", "grf", "mix")}) + "q" + _hash(
         [Path(seq.__file__).read_bytes(), json.dumps(cfg.get("settings", {}), sort_keys=True), str(cfg["seed"])])
     sets = [frozenset([m]) for m in MATCHES] + [frozenset(p) for p in itertools.combinations(MATCHES, 2) if pairs]
     name = lambda ex, k: k if ex == {k} else f"{k}_x{''.join(sorted(ex - {k}))}"
@@ -308,6 +308,8 @@ def main():
     t0 = time.time()
     print(f"variant {NAME} {CONFIG}  features {FEATURE_VERSION}  stage 1 {STAGE1_VERSION}", flush=True)
     data = {m: copies(m) for m in MATCHES}
+    if CONFIG.get("mix"):              # Y29: more copies, or more with random ball gaps; evaluation copies unchanged
+        data = mix.apply(data, CONFIG["mix"])
     mirrored = {m: mirrored_eval(m, data[m][1][0]) for m in MATCHES} if CONFIG.get("tta") else None
     if mirrored is not None:
         print(f"mirrored evaluation copies built and checked ({time.time() - t0:.0f} s)", flush=True)
@@ -328,7 +330,7 @@ def main():
 
     # 1. stage-1 predictions: outer (kora.train folds) and inner (without m and k)
     twin = None
-    if (CONFIG.get("clf") or CONFIG.get("grf")) and not CONFIG.get("eval_rand") and not CONFIG.get("ensemble"):   # Y20, Y28
+    if (CONFIG.get("clf") or CONFIG.get("grf") or CONFIG.get("mix")) and not CONFIG.get("eval_rand") and not CONFIG.get("ensemble"):   # Y20, Y28, Y29
         twin = (stage1_version({**CONFIG, "eval_rand": True}), eval_copies(True)[1])
     outer = {m: stage1(data, {m}, m, mirrored, twin) for m in MATCHES}
     if args.screen and not CONFIG.get("seq"):
