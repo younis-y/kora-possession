@@ -177,6 +177,8 @@ def member_stage1(seed, evs, pairs=True):
         todo = [ex for ex in sets if not all(path(fv, ex, k).exists() for fv in evs for k in ex)]
         if todo:
             train = {m: copies(m)[0] for m in MATCHES}
+            if CONFIG.get("mix"):      # Y29: the member's own extra copies (drawn on its seed)
+                train = {m: mix.training_sets(m, tr, CONFIG["mix"]) for m, tr in train.items()}
             for ex in todo:
                 clf = fit_classifier([s for j in MATCHES if j not in ex for s in train[j]])
                 for fv, X in evs.items():
@@ -202,6 +204,8 @@ def seq_stage1(data, evs, cfg, pairs=True):
     for ex in sets:
         if all(path(fv, ex, k).exists() for fv in evs for k in ex):
             continue
+        if CONFIG.get("mix"):          # Y29 keeps the networks' cached fits; a refit here would train on other copies
+            raise SystemExit(f"seq cache missing for {sorted(ex)}: Y29 reuses the networks' fits")
         train = [(s, half[j]) for j in MATCHES if j not in ex for s in data[j][0]]
         model = seq.fit([s for s, _ in train], [h for _, h in train], cfg["seed"], CONFIG.get("balance") or 0.0,
                         cfg.get("settings"))

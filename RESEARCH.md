@@ -833,6 +833,16 @@ team agrees to resubmit; otherwise `y23_big2` stays the submission.
 
 ### [pending] Y29: Do more training copies, or more of them with random ball gaps, help under heavy gaps?
 
+**Screen and Stage A (2026-11-10, clean tree `044412e`, `~/kora-runs/y29_pass.py`).** Screen against `mixed`
+0.7516 / `mixed_rand` 0.6643: `y29_x4` normal −0.0000 (4/7), heavy +0.0067 (5/7), passes; `y29_r34` normal
++0.0013 (4/7), heavy +0.0102 (6/7), passes and goes on; `y29_r1` normal −0.0049 (2/7), heavy +0.0011 (4/7),
+fails. Stage A passes: `kora.compare mixed_rand y29_r34_rand` 0.6607 → 0.6793 (+0.0186, median +0.0192),
+better on 7 of 7 (min +0.0023); `kora.compare mixed y29_r34` 0.7511 → 0.7528 (+0.0017, median +0.0029, 4/7,
+min −0.0190), inside the 0.01 limit. More copies help, more of them with random gaps help more, and dropping
+the camera-on copies entirely costs the normal copies. Stage B (`y29_prod`, `y29_prod_rand`) is added now,
+as registered: the base member reuses `y29_r34`'s fits, members 2028 and 2029 get their own extra copies
+on their seeds, and the networks keep `y23_big2`'s fits (a missing network fit stops the run).
+
 **Why (2026-11-10).** The challenge match has the ball missing on 41% of graded frames, which is the
 heavy-gap condition, and that is where we are weakest (0.6873 for what ships against 0.7665 on normal
 copies). The one change aimed at it, mixed training (J6), gave +0.0881 under heavy gaps on 7 of 7, and its

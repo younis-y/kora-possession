@@ -26,6 +26,12 @@ class Y29Tests(unittest.TestCase):
         keys = {variant.stage1_version(variant.VARIANTS[n]) for n in variant.MIX}
         self.assertEqual(len(keys), 3)
 
+    def test_stage_b_reuses_the_winner_and_the_networks(self):
+        for suffix in ("", "_rand"):
+            v = variant.VARIANTS["y29_prod" + suffix]
+            self.assertEqual(variant.stage1_version(v), variant.stage1_version(variant.VARIANTS["y29_r34" + suffix]))
+            self.assertEqual(v["seq"], variant.VARIANTS["y23_big2" + suffix]["seq"])
+
 
 if __name__ == "__main__":
     unittest.main()

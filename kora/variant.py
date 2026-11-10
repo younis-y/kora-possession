@@ -147,6 +147,8 @@ for _n, _m in MIX.items():
     VARIANTS[_n] = {**VARIANTS["mixed"], "mix": _m}
     VARIANTS[f"{_n}_rand"] = {**VARIANTS["mixed_rand"], "mix": _m}
 del _n, _m
+VARIANTS["y29_prod"] = {**VARIANTS["y23_big2"], "mix": MIX["y29_r34"]}      # Y29 Stage B: networks keep their fits
+VARIANTS["y29_prod_rand"] = {**VARIANTS["y23_big2_rand"], "mix": MIX["y29_r34"]}
 PRODUCTION = "y23_big2"     # Y23: y16_seeds + larger temporal network (2 seeds), 7/7 over y16_seeds (was y16_seeds)
 FEATURE_KEYS = ("touch", "mixed", "eval_rand")
 TRAIN_KEYS = ("balance",)
