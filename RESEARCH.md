@@ -785,7 +785,14 @@ change on the second seed raises the heavy-gap mean (`kora.compare y23_big_s2028
 Deploying it needs `kora.run` to apply the snap after decoding; that is written only if it is kept, and only
 after Vladymyr signs off. Otherwise production stays `y23_big2` and the submission is frozen.
 
-### [pending] Y28: Do synthetic Google Research Football games help as extra stage-1 training data?
+### [dropped] Y28: Do synthetic Google Research Football games help as extra stage-1 training data?
+
+**Outcome (2026-11-10):** no, it fails the screen. Normal copies 0.7516 → 0.7469 (−0.0048, 3/7 better), heavy
+gaps 0.6643 → 0.6564 (−0.0079, 2/7): neither delta reaches +0.002 and the heavy-gap one is below −0.005, so
+Stages A and B were not run. Clean tree `ef53223`, `~/kora-runs/y28_pass.py`, `models/screen_y28_grf{,_rand}.json`.
+Simulated play hurts more where the ball is missing, which is where it was meant to help; a likely (untested)
+reason is that GRF players do not move like real ones around a hidden ball. Production stays `y23_big2`, the submission.
+
 
 **Why (2026-11-09).** Every candidate since Y23 has worked on the same seven labelled matches, and the open
 alternatives are spent: SkillCorner's labels are too coarse (Y19; its phases of play, merged into team
