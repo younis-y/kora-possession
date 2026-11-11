@@ -7,6 +7,7 @@ trees over window summaries of the tracking, blended with a temporal convolution
 the frames in order. A decoder then turns those probabilities into a label path with realistic
 possessions.
 Nothing in the pipeline is fitted to, tuned on, or selected with labels from the challenge match.
+Figure 1, at the end of this document, shows the whole pipeline on one page.
 
 Why learned rather than hand rules: every hand rule has a threshold, and with no labels on this
 match the only honest way to set thresholds is on other matches where the answer is known. Once that
@@ -44,17 +45,20 @@ round (Y26, Y27) was judged on heavy-gap copies first.
 | a smaller temporal network from one seed | dropped | 0.7673 (+0.0107, 7/7) with seed 2027 but 0.7577 (+0.0011, 4/7) with seed 2028: most of the gain was one seed's luck (`RESEARCH.md` Y22) |
 | SkillCorner possession events as labels (20 more test matches) | dropped by a pre-registered gate | labels derived from its player-possession events are coarser than the possession scored here: 136 possessions per 45 minutes against IDSSE's 206, median 5.7 s against 3.8 s. As a test set they would reward missing short possessions (`RESEARCH.md` Y19) |
 | heavy-gap decoder choice, dearer dead-ball switch where the ball is missing, cuts, more network weight where the ball is missing, snapping team changes to the detector | dropped | decode-only, judged on heavy-gap copies first: 0.6822, 0.6817, 0.6815, 0.6831 (5/7, then −0.0037 on a second seed), 0.6829 (1/7), against 0.6860 for what ships (`RESEARCH.md` Y26, Y27) |
+| synthetic Google Research Football games (Radke and Tilbury, AAMAS 2025, `Dtradke/grf_tracking_data` on GitHub; the repository names no licence), 150 games as extra tree training data | dropped | screened against the single-seed base: 0.7469 vs 0.7516 (3/7) on normal copies and 0.6564 vs 0.6643 (2/7) on heavy-gap copies; simulated play hurt most where the ball is missing (`RESEARCH.md` Y28) |
+| four degraded training copies per match instead of two, three of them with random ball gaps | dropped | one tree model gained under heavy gaps (0.6607 to 0.6793, 7/7), but on the submitted ensemble it moved heavy gaps from 0.6822 to 0.6824 (3/7) and normal copies from 0.7665 to 0.7618 (1/7): the three-seed average and the network already remove those errors (`RESEARCH.md` Y29) |
 
 ## 3. Training data (all from other games)
 
 | dataset | what | labels | who labelled | size |
 |---|---|---|---|---|
 | IDSSE open data (Bassek, Weber, Rein, Memmert, *Scientific Data* 2025, doi:10.1038/s41597-025-04505-y), CC BY 4.0 | 7 full Bundesliga / 2. Bundesliga 2022/23 matches, DFL positional data, 25 Hz | per-frame `BallStatus` (alive/dead) and `BallPossession` (home/guest) from the official tracking feed | DFL / Sportec Solutions, official match data | about 1.0 M labelled frames |
-| SkillCorner open data (github.com/SkillCorner/opendata, commit 4340d27), MIT licence, credit SkillCorner | 20 A-League 2024/25 matches of automatic broadcast tracking, 10 fps, with `is_detected` for the ball and every player | none used as training labels; only its detection gaps are measured (section 4) | n/a | about 1.2 M frames |
+| SkillCorner open data (`SkillCorner/opendata` on GitHub, commit 4340d27), MIT licence, credit SkillCorner | 20 A-League 2024/25 matches of automatic broadcast tracking, 10 fps, with `is_detected` for the ball and every player | none used as training labels; only its detection gaps are measured (section 4) | n/a | about 1.2 M frames |
 
 These labels are the same kind the challenge ground truth is derived from: corrected tracking that
 marks the ball dead or names the team that owns it. No event data, possession data or annotation
-of the challenge match is used anywhere.
+of the challenge match is used anywhere. Simulated Google Research Football games were tried as
+extra training data and dropped (section 2), so the submitted models are trained on IDSSE only.
 
 ## 4. Making the training data look like automatic tracking (external measurements only)
 
@@ -232,6 +236,8 @@ possessions under 1 s rose from 0.21 (B0) to 0.32, and for 1-2 s from 0.44 to 0.
   data, is excluded: its Terms of Use forbid training machine-learning models on it. Decoding changes
   are exhausted: the last round (choosing the decoder on heavy-gap copies, dearer dead-ball switches
   where the ball is missing, snapping changes to the detector) found nothing (`RESEARCH.md` Y26, Y27).
+  Simulated games and extra degraded copies did not help either (Y28, Y29); the
+  one untried variant is retraining the temporal network on the extra copies, not only the trees.
 
 ## 10. Reproduction
 
@@ -245,7 +251,7 @@ shasum -a 256 -c models/submission.sha256                 # must print OK: the s
 .venv/bin/python -m kora.compare y16_seeds y23_big2       # paired comparison, with the keep rule
 ```
 
-Match data is gated and never committed; `data/` and every derived array are gitignored.
+The submitted file is built from the git tag `submission`. Match data is gated and never committed; `data/` and every derived array are gitignored.
 
 ## 11. Compliance with the organisers' rules (clarification of 3 November 2026)
 
@@ -270,3 +276,5 @@ Match data is gated and never committed; `data/` and every derived array are git
 - **Challenge data is read only for inference and automatic checks** (`kora/run.py`, `kora/checks.py`;
   `kora/profile.py` and `kora/shift.py` are diagnostics). A unit test (`tests/test_compliance.py`)
   fails if any other module imports the challenge loaders.
+
+![Pipeline overview: build on other matches, run on the challenge match, graded by the organisers](pipeline.png)
