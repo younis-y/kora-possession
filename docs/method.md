@@ -53,7 +53,7 @@ Y29) were judged on heavy-gap copies first, and Y28 and Y29 were first screened 
 | dataset | what | labels | who labelled | size |
 |---|---|---|---|---|
 | IDSSE open data (Bassek, Weber, Rein, Memmert, *Scientific Data* 2025, doi:10.1038/s41597-025-04505-y), CC BY 4.0 | 7 full Bundesliga / 2. Bundesliga 2022/23 matches, DFL positional data, 25 Hz | per-frame `BallStatus` (alive/dead) and `BallPossession` (home/guest) from the official tracking feed | DFL / Sportec Solutions, official match data | about 1.0 M labelled frames |
-| SkillCorner open data (`SkillCorner/opendata` on GitHub, commit 4340d27), MIT licence, credit SkillCorner | 20 A-League 2024/25 matches of automatic broadcast tracking, 10 fps, with `is_detected` for the ball and every player | none used as training labels; only its detection gaps are measured (section 4) | n/a | about 1.2 M frames |
+| SkillCorner open data (SkillCorner's opendata repository on GitHub, commit 4340d27), MIT licence, credit SkillCorner | 20 A-League 2024/25 matches of automatic broadcast tracking, 10 fps, with `is_detected` for the ball and every player | none used as training labels; only its detection gaps are measured (section 4) | n/a | about 1.2 M frames |
 
 These labels are the same kind the challenge ground truth is derived from: corrected tracking that
 marks the ball dead or names the team that owns it. No event data, possession data or annotation
