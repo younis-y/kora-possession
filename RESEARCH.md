@@ -831,7 +831,15 @@ this round: no other game count, stride or weighting.
 Production changes only if Stage A and Stage B both pass, the build is extended to fit with GRF, and the
 team agrees to resubmit; otherwise `y23_big2` stays the submission.
 
-### [pending] Y29: Do more training copies, or more of them with random ball gaps, help under heavy gaps?
+### [dropped] Y29: Do more training copies, or more of them with random ball gaps, help under heavy gaps?
+
+**Outcome (2026-11-11):** no, it fails Stage B. On production (`y29_prod`, clean tree `8dc203f`): heavy gaps
+`kora.compare y23_big2_rand y29_prod_rand` 0.6822 → 0.6824 (+0.0002, median −0.0004, 3/7), normal copies
+`kora.compare y23_big2 y29_prod` 0.7665 → 0.7618 (−0.0046, 1/7). The heavy-gap rule (mean up and at least
+5 of 7) fails, so production stays `y23_big2`, the submission. The +0.0186 that one tree model gains (Stage A)
+does not survive the three-seed average and the temporal network: the ensemble already removes most of the
+errors the extra random-gap copies fix. The networks kept their `y23_big2` fits, as registered; retraining them
+on these copies was not tried.
 
 **Screen and Stage A (2026-11-10, clean tree `044412e`, `~/kora-runs/y29_pass.py`).** Screen against `mixed`
 0.7516 / `mixed_rand` 0.6643: `y29_x4` normal −0.0000 (4/7), heavy +0.0067 (5/7), passes; `y29_r34` normal
